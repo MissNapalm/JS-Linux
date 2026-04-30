@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.19.0/css/xterm.css" />
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body class="w-full h-full overflow-hidden">
@@ -26,7 +27,7 @@
   <div class="flex flex-col items-center gap-4 rounded-2xl shadow-2xl p-10 w-80"
     style="background:rgba(255,255,255,0.97);border:1px solid rgba(255,255,255,0.15)">
     <div class="text-5xl select-none">☠</div>
-    <div class="text-xs text-slate-400 font-sans tracking-widest uppercase">root@kali</div>
+    <div class="text-xs text-slate-400 font-sans tracking-widest uppercase">kali@HackletOS</div>
     <input id="login-pass" type="password" placeholder="Password"
       class="w-full px-4 py-2.5 rounded-lg text-sm font-mono outline-none transition
              bg-slate-50 border border-slate-200 text-slate-800
@@ -37,7 +38,7 @@
              bg-violet-600 hover:bg-violet-700 active:bg-violet-800 transition-colors">
       Sign In
     </button>
-    <div class="text-xs text-slate-300 font-sans">Kali Linux 2024.2 · Kernel 6.6.9-amd64</div>
+    <div class="text-xs text-slate-300 font-sans">HackletOS 2024.2 · Kernel 6.6.9-amd64</div>
   </div>
 </div>
 
@@ -81,13 +82,14 @@
 
     <div class="flex items-center gap-2 px-4 py-3 border-b border-slate-100 flex-shrink-0">
       <i class="fa fa-trophy text-amber-400 text-sm"></i>
-      <span class="text-sm font-semibold text-slate-700" style="font-family:'Ubuntu',sans-serif">CTF Missions</span>
+      <span class="text-sm font-semibold text-slate-700 flex-1" style="font-family:'Ubuntu',sans-serif">CTF Missions</span>
+      <button id="ctf-close-btn" title="Close" class="text-slate-300 hover:text-slate-500 text-lg font-bold leading-none">×</button>
     </div>
 
     <div id="ctf-score-area" class="px-4 py-3 border-b border-slate-100 flex-shrink-0">
       <div class="flex items-baseline gap-1">
         <span id="ctf-score" class="text-3xl font-bold font-sans text-violet-600">0</span>
-        <span id="ctf-max" class="text-xs text-slate-400 font-sans"> / 2550 pts</span>
+        <span id="ctf-max" class="text-xs text-slate-400 font-sans"> / 3050 pts</span>
       </div>
       <div class="h-1.5 rounded-full mt-2 mb-1.5 overflow-hidden bg-slate-100">
         <div id="ctf-bar" class="h-full rounded-full"
@@ -125,16 +127,11 @@
       <div id="app-menu" class="hidden absolute bottom-12 left-0 rounded-xl py-1.5 min-w-[200px] z-[200]"
         style="background:#fff;border:1px solid #e2e8f0;
                box-shadow:0 -4px 24px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.04)">
+        <div class="app-menu-label px-4 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-widest" style="font-family:'Ubuntu',sans-serif">System</div>
         <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
                     text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="terminal"
              style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-terminal text-slate-400 w-4 text-xs"></i> Terminal
-        </div>
-        <div class="h-px mx-3 my-1 bg-slate-100"></div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="browser"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa-brands fa-firefox text-orange-400 w-4 text-xs"></i> Firefox ESR
+          <i class="fa fa-terminal text-slate-500 w-4 text-xs"></i> Terminal
         </div>
         <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
                     text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="files"
@@ -142,9 +139,48 @@
           <i class="fa fa-folder text-yellow-400 w-4 text-xs"></i> Files
         </div>
         <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
+                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="browser"
+             style="font-family:'Ubuntu',sans-serif">
+          <i class="fa-brands fa-firefox text-orange-400 w-4 text-xs"></i> Firefox ESR
+        </div>
+        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
                     text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="settings"
              style="font-family:'Ubuntu',sans-serif">
           <i class="fa fa-gear text-slate-400 w-4 text-xs"></i> Settings
+        </div>
+        <div class="h-px mx-3 my-1 bg-slate-100"></div>
+        <div class="app-menu-label px-4 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-widest" style="font-family:'Ubuntu',sans-serif">Security Tools</div>
+        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
+                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="burp"
+             style="font-family:'Ubuntu',sans-serif">
+          <i class="fa fa-shield-halved text-orange-500 w-4 text-xs"></i> Burp Suite Pro
+        </div>
+        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
+                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="wireshark"
+             style="font-family:'Ubuntu',sans-serif">
+          <i class="fa fa-wave-square text-blue-500 w-4 text-xs"></i> Wireshark
+        </div>
+        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
+                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="metasploit"
+             style="font-family:'Ubuntu',sans-serif">
+          <i class="fa fa-skull text-red-500 w-4 text-xs"></i> Metasploit Framework
+        </div>
+        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
+                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="ghidra"
+             style="font-family:'Ubuntu',sans-serif">
+          <i class="fa fa-magnifying-glass text-green-500 w-4 text-xs"></i> Ghidra
+        </div>
+        <div class="h-px mx-3 my-1 bg-slate-100"></div>
+        <div class="app-menu-label px-4 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-widest" style="font-family:'Ubuntu',sans-serif">Development</div>
+        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
+                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="vscode"
+             style="font-family:'Ubuntu',sans-serif">
+          <i class="fa fa-code text-blue-400 w-4 text-xs"></i> VS Code
+        </div>
+        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
+                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="texteditor"
+             style="font-family:'Ubuntu',sans-serif">
+          <i class="fa fa-file-lines text-slate-400 w-4 text-xs"></i> Text Editor
         </div>
       </div>
     </div>
@@ -211,6 +247,33 @@
   </div>
 </div>
 
+<!-- ── CTF Step Explanation modal ──────────────────────────────────────────── -->
+<div id="ctf-explain-modal" class="hidden fixed inset-0 flex items-center justify-center z-[600]"
+  style="background:rgba(0,0,0,0.5);backdrop-filter:blur(6px)">
+  <div class="rounded-2xl shadow-2xl overflow-hidden" style="width:440px;max-height:80vh;background:#fff">
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+      <div id="ctf-explain-num" class="w-7 h-7 rounded-full bg-violet-100 text-violet-600 text-xs font-bold
+           flex items-center justify-center flex-shrink-0" style="font-family:'Ubuntu',sans-serif"></div>
+      <h3 id="ctf-explain-title" class="text-sm font-semibold text-slate-800 flex-1" style="font-family:'Ubuntu',sans-serif"></h3>
+      <button id="ctf-explain-close" class="text-slate-300 hover:text-slate-500 text-xl font-bold leading-none">×</button>
+    </div>
+    <div class="px-5 py-4 overflow-y-auto" style="max-height:calc(80vh - 130px)">
+      <p id="ctf-explain-text" class="text-sm text-slate-600 leading-relaxed mb-4" style="font-family:'Ubuntu',sans-serif"></p>
+      <div class="rounded-lg p-3 bg-slate-50 border border-slate-100">
+        <div class="text-xs text-slate-400 mb-1.5 font-medium" style="font-family:'Ubuntu',sans-serif">Command hint</div>
+        <code id="ctf-explain-hint" class="text-xs text-violet-700 font-mono break-all"></code>
+      </div>
+    </div>
+    <div class="px-5 pb-4 pt-2">
+      <button id="ctf-explain-ok"
+        class="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 transition-colors"
+        style="font-family:'Ubuntu',sans-serif">Got it</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xterm@4.19.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.js"></script>
 <script src="js/commands.js"></script>
 <script src="js/ctf.js"></script>
 <script src="js/terminal.js"></script>

@@ -69,7 +69,10 @@
     CTF.init();
 
     document.getElementById('ctf-toggle-btn').addEventListener('click', () => {
-      document.getElementById('ctf-sidebar').classList.toggle('collapsed');
+      const sb = document.getElementById('ctf-sidebar');
+      sb.classList.toggle('collapsed');
+      const isOpen = !sb.classList.contains('collapsed');
+      document.getElementById('ctf-toggle-btn').classList.toggle('active-btn', isOpen);
     });
 
     document.getElementById('fp-close').addEventListener('click', () => {
@@ -152,30 +155,26 @@
       const tid = ++tabSeq;
 
       const tab = document.createElement('div');
-      tab.className = 'term-tab';
+      tab.className = 'term-tab active';
       tab.dataset.tid = tid;
       tab.innerHTML = `<span>bash</span><button class="term-tab-x" title="Close tab">×</button>`;
 
       const pane = document.createElement('div');
-      pane.className = 'term-pane';
+      pane.className = 'term-pane active';
       pane.dataset.tid = tid;
-      pane.innerHTML = `
-        <div class="term-output"></div>
-        <div class="term-prompt-top"></div>
-        <div class="term-input-row">
-          <span class="term-prompt"></span>
-          <input class="term-input" type="text" autocomplete="off" spellcheck="false" />
-        </div>
-      `;
 
-      // Insert tab before the + button
+      // Deactivate existing tabs/panes, then insert new ones already active
+      tabsBar.querySelectorAll('.term-tab').forEach(t => t.classList.remove('active'));
+      panesDiv.querySelectorAll('.term-pane').forEach(p => p.classList.remove('active'));
+
       const plusBtn = tabsBar.querySelector('.term-new-tab');
       tabsBar.insertBefore(tab, plusBtn);
       panesDiv.appendChild(pane);
 
+      // Pane is display:flex now — init terminal with correct dimensions
       const termInst = createTerminal();
-      termInst.init(pane);
       pane._termInst = termInst;
+      termInst.init(pane);
 
       tab.addEventListener('click', e => {
         if (e.target.classList.contains('term-tab-x')) return;
@@ -185,15 +184,15 @@
         e.stopPropagation();
         closeTab(tid);
       });
-
-      switchTab(tid);
     }
 
     function switchTab(tid) {
       tabsBar.querySelectorAll('.term-tab').forEach(t => t.classList.toggle('active', t.dataset.tid == tid));
       panesDiv.querySelectorAll('.term-pane').forEach(p => p.classList.toggle('active', p.dataset.tid == tid));
       const pane = panesDiv.querySelector(`.term-pane[data-tid="${tid}"]`);
-      if (pane) { const inp = pane.querySelector('.term-input'); if (inp) inp.focus(); }
+      if (pane?._termInst) {
+        requestAnimationFrame(() => { pane._termInst.fit(); pane._termInst.focus(); });
+      }
     }
 
     function closeTab(tid) {
@@ -541,8 +540,9 @@
     document.querySelectorAll('.tb-win-btn').forEach(b => b.classList.remove('active'));
     const btn = document.querySelector(`.tb-win-btn[data-win="${win.dataset.winId}"]`);
     if (btn) btn.classList.add('active');
-    const inp = win.querySelector('.term-input');
-    if (inp) inp.focus();
+    const activePane = win.querySelector('.term-pane.active');
+    if (activePane?._termInst) activePane._termInst.focus();
+    else { const inp = win.querySelector('.term-input'); if (inp) inp.focus(); }
   }
 
   function minimizeWindow(win) {
@@ -560,8 +560,9 @@
     document.querySelectorAll('.tb-win-btn').forEach(b => b.classList.remove('active'));
     const btn = document.querySelector(`.tb-win-btn[data-win="${win.dataset.winId}"]`);
     if (btn) btn.classList.add('active');
-    const inp = win.querySelector('.term-input');
-    if (inp) inp.focus();
+    const activePane2 = win.querySelector('.term-pane.active');
+    if (activePane2?._termInst) activePane2._termInst.focus();
+    else { const inp = win.querySelector('.term-input'); if (inp) inp.focus(); }
   }
 
   function toggleMaximize(win) {
@@ -583,6 +584,9 @@
       win.classList.add('maximized');
     }
     focusWindow(win);
+    setTimeout(() => {
+      win.querySelectorAll('.term-pane').forEach(p => { if (p._termInst) p._termInst.fit(); });
+    }, 50);
   }
 
   let _winIdSeq = 0;

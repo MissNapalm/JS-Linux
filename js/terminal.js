@@ -4,43 +4,106 @@ const TERM_INSTANCES = [];
 
 function createTerminal() {
   const inst = {
+    _xterm: null,
+    _fitAddon: null,
     _history: [],
     _histIdx: -1,
     _busy: false,
+    _liveMode: false,
     _loadCancel: null,
     _progressFn: null,
     _loadStart: 0,
     _loadTotal: 0,
-    _outputEl: null,
-    _inputEl: null,
-    _promptEl: null,
-    _prompt1El: null,
     _sudoPendingCmd: null,
+    _sudoAttempts: 0,
+    _inputBuf: '',
+    _cursorPos: 0,
 
     init(container) {
-      this._outputEl  = container.querySelector('.term-output');
-      this._inputEl   = container.querySelector('.term-input');
-      this._promptEl  = container.querySelector('.term-prompt');
-      this._prompt1El = container.querySelector('.term-prompt-top');
+      const TermClass = (typeof Terminal === 'function') ? Terminal
+                      : (Terminal && typeof Terminal.Terminal === 'function') ? Terminal.Terminal
+                      : null;
+      const FitClass = (typeof FitAddon !== 'undefined')
+                      ? (typeof FitAddon.FitAddon === 'function' ? FitAddon.FitAddon : FitAddon)
+                      : null;
 
-      this._updatePrompt();
-      this._inputEl.focus();
+      if (!TermClass) { container.textContent = 'xterm.js failed to load'; return; }
 
-      this._inputEl.addEventListener('keydown', e => this._onKey(e));
-      this._outputEl.addEventListener('click', () => {
-        if (this._sudoPendingCmd !== null) this._outputEl.focus();
-        else this._inputEl.focus();
+      this._xterm = new TermClass({
+        fontFamily: '"Cascadia Code", "Fira Code", "Courier New", monospace',
+        fontSize: 13,
+        lineHeight: 1.25,
+        theme: {
+          background: '#0d0d14',
+          foreground: '#d4d4d4',
+          cursor: '#a78bfa',
+          cursorAccent: '#0d0d14',
+          selectionBackground: 'rgba(167,139,250,0.25)',
+          black: '#1e1e2e', red: '#f38ba8', green: '#a6e3a1',
+          yellow: '#f9e2af', blue: '#89b4fa', magenta: '#cba6f7',
+          cyan: '#89dceb', white: '#cdd6f4',
+          brightBlack: '#45475a', brightRed: '#f38ba8', brightGreen: '#a6e3a1',
+          brightYellow: '#f9e2af', brightBlue: '#89b4fa', brightMagenta: '#cba6f7',
+          brightCyan: '#89dceb', brightWhite: '#ffffff',
+        },
+        cursorBlink: true,
+        cursorStyle: 'block',
+        scrollback: 2000,
+        convertEol: true,
       });
 
-      // Capture keypresses while input row is hidden (sudo prompt or busy load)
-      this._outputEl.tabIndex = -1;
-      this._outputEl.addEventListener('keydown', e => {
-        if (this._sudoPendingCmd !== null || this._busy) { e.preventDefault(); this._onKey(e); }
-      });
+      if (FitClass) {
+        this._fitAddon = new FitClass();
+        this._xterm.loadAddon(this._fitAddon);
+      }
 
+      this._xterm.open(container);
+
+      // Fit synchronously — container must be visible (display:flex) before this call
+      if (this._fitAddon) this._fitAddon.fit();
+      this._xterm.focus();
+
+      this._printWelcome();
+      this._writePrompt();
+      this._xterm.onData(d => this._onData(d));
+
+      // Re-fit after first paint in case flex layout settled differently
+      requestAnimationFrame(() => { if (this._fitAddon) this._fitAddon.fit(); });
+    },
+
+    focus() { this._xterm?.focus(); },
+
+    fit() {
+      if (this._fitAddon) {
+        this._fitAddon.fit();
+      }
+    },
+
+    // ── Colors ──────────────────────────────────────────────────────────────
+    _clsColor(cls) {
+      return { p:'\x1b[35m', d:'\x1b[90m', g:'\x1b[32m', r:'\x1b[31m',
+               y:'\x1b[33m', c:'\x1b[36m', b:'\x1b[94m', h:'\x1b[97m', w:'\x1b[97m' }[cls] || '';
+    },
+
+    _writeLine(text, cls) {
+      const color = this._clsColor(cls);
+      for (const line of String(text).split('\n')) {
+        if (color) this._xterm.writeln(color + line + '\x1b[0m');
+        else this._xterm.writeln(line);
+      }
+    },
+
+    _printLines(lines) {
+      for (const l of lines) {
+        if (l.t === '') this._xterm.writeln('');
+        else this._writeLine(l.t, l.cls);
+      }
+    },
+
+    _printWelcome() {
       this._printLines([
         { t: '┌──────────────────────────────────────────────────────────┐', cls: 'p' },
-        { t: '│  Kali Linux 2024.2 — Kerberoasting CTF Lab               │', cls: 'p' },
+        { t: '│  HackletOS 2024.2 — Kerberoasting CTF Lab                │', cls: 'p' },
         { t: '│  Type  help  to see all attack steps                     │', cls: 'p' },
         { t: '│  CTF Missions panel on the right tracks your progress    │', cls: 'p' },
         { t: '└──────────────────────────────────────────────────────────┘', cls: 'p' },
@@ -48,137 +111,207 @@ function createTerminal() {
       ]);
     },
 
-    _updatePrompt() {
+    // ── Prompt ──────────────────────────────────────────────────────────────
+    _writePrompt() {
       if (SIM.windowsShell) {
-        this._prompt1El.innerHTML = '';
-        this._promptEl.style.color = '#fbbf24';
-        this._promptEl.textContent = 'C:\\Windows\\system32> ';
-      } else {
-        const user  = SIM.user;
-        const home  = user === 'root' ? '/root' : '/home/kali';
-        const cwd   = SIM.cwd === home ? '~' : SIM.cwd;
-        const sigil = user === 'root' ? '#' : '$';
-        this._prompt1El.innerHTML =
-          `<span style="color:#a78bfa">┌──(</span>` +
-          `<span style="color:#22c55e;font-weight:bold">${this._esc(user)}</span>` +
-          `<span style="color:#a78bfa">㉿</span>` +
-          `<span style="color:#22c55e">kali</span>` +
-          `<span style="color:#a78bfa">)-[</span>` +
-          `<span style="color:#60a5fa">${this._esc(cwd)}</span>` +
-          `<span style="color:#a78bfa">]</span>`;
-        this._promptEl.style.color = '';
-        this._promptEl.innerHTML =
-          `<span style="color:#a78bfa">└─</span>` +
-          `<span style="color:#fff">${sigil} </span>`;
+        this._xterm.write('\x1b[33mC:\\Windows\\system32>\x1b[0m ');
+        return;
       }
+      const user  = SIM.user;
+      const home  = user === 'root' ? '/root' : '/home/kali';
+      const cwd   = SIM.cwd === home ? '~' : SIM.cwd;
+      const sigil = user === 'root' ? '#' : '$';
+      this._xterm.writeln(
+        '\x1b[35m┌──(\x1b[0m\x1b[1;32m' + user + '\x1b[0m' +
+        '\x1b[35m㉿\x1b[0m\x1b[32mkali\x1b[0m' +
+        '\x1b[35m)-[\x1b[0m\x1b[94m' + cwd + '\x1b[0m\x1b[35m]\x1b[0m'
+      );
+      this._xterm.write('\x1b[35m└─\x1b[0m\x1b[97m' + sigil + ' \x1b[0m');
     },
 
-    _onKey(e) {
-      if (e.key === 'c' && e.ctrlKey) {
-        e.preventDefault();
-        if (this._busy && this._loadCancel) {
-          this._loadCancel();
-          this._loadCancel = null;
-          this._appendLine({ t: '^C', cls: 'd' });
-          return;
+    _updatePrompt() {
+      if (this._busy || this._sudoPendingCmd !== null) return;
+      if (this._cursorPos > 0) this._xterm.write('\r\x1b[K');
+      this._inputBuf = '';
+      this._cursorPos = 0;
+      this._xterm.writeln('');
+      this._writePrompt();
+    },
+
+    // ── Input handling ──────────────────────────────────────────────────────
+    _onData(data) {
+      // ── Busy (scan / load animation / live display) ──────────────────────
+      if (this._busy) {
+        if (data === '\x03' || (this._liveMode && (data === 'q' || data === 'Q'))) {
+          if (this._loadCancel) { this._loadCancel(); this._loadCancel = null; }
+        } else if (data === '\r' && this._progressFn) {
+          const elapsed = Date.now() - this._loadStart;
+          this._xterm.writeln('');
+          this._printLines(this._progressFn(elapsed, this._loadTotal));
         }
-        if (this._sudoPendingCmd !== null) {
-          this._sudoPendingCmd = null;
-          this._appendLine({ t: '^C', cls: 'd' });
-          this._inputEl.value = '';
-          this._prompt1El.style.display = '';
-          this._inputEl.parentElement.style.display = '';
-          this._updatePrompt();
-          this._inputEl.focus();
-          return;
-        }
-        this._echoCommand(this._inputEl.value);
-        this._appendLine({ t: '^C', cls: 'd' });
-        this._inputEl.value = '';
         return;
       }
 
-      // Enter during a scan: print nmap-style progress
-      if (this._busy && e.key === 'Enter' && this._progressFn) {
-        e.preventDefault();
-        const elapsed = Date.now() - this._loadStart;
-        this._printLines(this._progressFn(elapsed, this._loadTotal));
-        this._scrollBottom();
-        return;
-      }
-
-      if (this._busy) { e.preventDefault(); return; }
-
-      if (e.key === 'Enter') {
-        const val = this._inputEl.value;
-        this._inputEl.value = '';
-        if (this._sudoPendingCmd !== null) {
-          this._runSudoCmd(this._sudoPendingCmd);
+      // ── Sudo password entry ─────────────────────────────────────────────
+      if (this._sudoPendingCmd !== null) {
+        if (data === '\x03') {
+          this._sudoPendingCmd = null; this._inputBuf = '';
+          this._xterm.writeln('^C'); this._writePrompt();
+        } else if (data === '\r') {
+          const pwd = this._inputBuf;
+          this._inputBuf = '';
+          this._xterm.writeln('');
+          if (pwd === 'root') {
+            this._sudoAttempts = 0;
+            this._runSudoCmd(this._sudoPendingCmd);
+          } else {
+            this._sudoAttempts++;
+            if (this._sudoAttempts >= 3) {
+              this._sudoAttempts = 0;
+              this._sudoPendingCmd = null;
+              this._xterm.writeln('\x1b[31msudo: 3 incorrect password attempts\x1b[0m');
+              this._writePrompt();
+            } else {
+              this._xterm.writeln('\x1b[31mSorry, try again.\x1b[0m');
+              this._xterm.write('\x1b[90m[sudo] password for ' + SIM.user + ': \x1b[0m');
+            }
+          }
+        } else if (data === '\x7f') {
+          if (this._inputBuf.length > 0) this._inputBuf = this._inputBuf.slice(0, -1);
         } else {
-          this._runCommand(val);
+          this._inputBuf += data;
         }
         return;
       }
 
-      if (this._sudoPendingCmd !== null) return;
+      // ── Normal input ────────────────────────────────────────────────────
+      if (data === '\x03') {
+        this._xterm.writeln('\x1b[90m^C\x1b[0m');
+        this._inputBuf = ''; this._cursorPos = 0;
+        this._writePrompt(); return;
+      }
+      if (data === '\x0c') {
+        this._xterm.clear(); this._writePrompt(); return;
+      }
+      if (data === '\r') {
+        const cmd = this._inputBuf;
+        this._inputBuf = ''; this._cursorPos = 0;
+        this._xterm.writeln('');
+        this._runCommand(cmd); return;
+      }
+      if (data === '\x7f') {
+        if (this._cursorPos > 0) {
+          const before = this._inputBuf.slice(0, this._cursorPos - 1);
+          const after  = this._inputBuf.slice(this._cursorPos);
+          this._inputBuf = before + after;
+          this._cursorPos--;
+          if (after.length === 0) {
+            this._xterm.write('\b \b');
+          } else {
+            this._xterm.write('\b\x1b[K' + after + '\x1b[' + after.length + 'D');
+          }
+        }
+        return;
+      }
 
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
+      // Arrow Up
+      if (data === '\x1b[A') {
         if (this._histIdx < this._history.length - 1) {
           this._histIdx++;
-          this._inputEl.value = this._history[this._history.length - 1 - this._histIdx];
+          this._setInput(this._history[this._history.length - 1 - this._histIdx]);
         }
         return;
       }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
+      // Arrow Down
+      if (data === '\x1b[B') {
         if (this._histIdx > 0) {
           this._histIdx--;
-          this._inputEl.value = this._history[this._history.length - 1 - this._histIdx];
-        } else {
-          this._histIdx = -1;
-          this._inputEl.value = '';
-        }
+          this._setInput(this._history[this._history.length - 1 - this._histIdx]);
+        } else { this._histIdx = -1; this._setInput(''); }
         return;
       }
-      if (e.key === 'l' && e.ctrlKey) {
-        e.preventDefault();
-        this._outputEl.innerHTML = '';
+      // Arrow Right
+      if (data === '\x1b[C') {
+        if (this._cursorPos < this._inputBuf.length) { this._cursorPos++; this._xterm.write('\x1b[C'); }
         return;
       }
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const val = this._inputEl.value;
+      // Arrow Left
+      if (data === '\x1b[D') {
+        if (this._cursorPos > 0) { this._cursorPos--; this._xterm.write('\x1b[D'); }
+        return;
+      }
+      // Home / Ctrl+A
+      if (data === '\x1b[H' || data === '\x01') {
+        if (this._cursorPos > 0) { this._xterm.write('\x1b[' + this._cursorPos + 'D'); this._cursorPos = 0; }
+        return;
+      }
+      // End / Ctrl+E
+      if (data === '\x1b[F' || data === '\x05') {
+        const d = this._inputBuf.length - this._cursorPos;
+        if (d > 0) { this._xterm.write('\x1b[' + d + 'C'); this._cursorPos = this._inputBuf.length; }
+        return;
+      }
+      // Tab completion
+      if (data === '\t') {
         const completions = [
           'sudo nmap ','sudo apt-get update','sudo apt-get install ',
           'nmap ','enum4linux ','crackmapexec smb 10.10.10.10 ',
           'impacket-GetUserSPNs ','impacket-secretsdump ','impacket-psexec ',
-          'john ','hashcat ','cat ','ls','pwd','help',
+          'john ','hashcat ','cat ','ls','pwd','help','whoami','cd ',
+          'lscpu','lsblk','lspci','lsusb','hostnamectl','timedatectl',
+          'dmidecode','vmstat','iostat','dmesg','journalctl',
+          'ss -tulpn','netstat -tulpn','dig ','traceroute ',
+          'dpkg -l','stat ','file ','xxd ','md5sum ','sha256sum ',
         ];
-        const match = completions.find(c => c.startsWith(val) && c !== val);
-        if (match) this._inputEl.value = match;
+        const match = completions.find(c => c.startsWith(this._inputBuf) && c !== this._inputBuf);
+        if (match) this._setInput(match);
+        return;
+      }
+      // Printable chars
+      if (data.length === 1 && data >= ' ') {
+        if (this._cursorPos === this._inputBuf.length) {
+          this._inputBuf += data; this._cursorPos++;
+          this._xterm.write(data);
+        } else {
+          const before = this._inputBuf.slice(0, this._cursorPos);
+          const after  = this._inputBuf.slice(this._cursorPos);
+          this._inputBuf = before + data + after;
+          this._cursorPos++;
+          this._xterm.write(data + after + '\x1b[' + after.length + 'D');
+        }
       }
     },
 
+    _setInput(val) {
+      if (this._cursorPos > 0) this._xterm.write('\x1b[' + this._cursorPos + 'D');
+      this._xterm.write('\x1b[K');
+      this._inputBuf = val; this._cursorPos = val.length;
+      if (val) this._xterm.write(val);
+    },
+
+    // ── Command execution ───────────────────────────────────────────────────
     async _runCommand(raw) {
       if (raw.trim()) { this._history.push(raw.trim()); this._histIdx = -1; }
-      this._echoCommand(raw);
 
       const result = runCommand(raw);
-      if (!result) { this._updatePrompt(); return; }
+      if (!result) { this._writePrompt(); return; }
 
-      if (result.clear) {
-        this._outputEl.innerHTML = '';
-        this._updatePrompt();
-        return;
-      }
+      if (result.clear) { this._xterm.clear(); this._writePrompt(); return; }
 
       if (result.waitSudo) {
         this._sudoPendingCmd = result.pendingCmd;
-        this._appendLine({ t: `[sudo] password for ${SIM.user}: `, cls: 'd' });
-        this._prompt1El.style.display = 'none';
-        this._inputEl.parentElement.style.display = 'none';
-        this._outputEl.focus();
+        this._inputBuf = '';
+        this._xterm.write('\x1b[90m[sudo] password for ' + SIM.user + ': \x1b[0m');
+        return;
+      }
+
+      if (result.liveDisplay) {
+        this._busy = true;
+        this._liveMode = true;
+        await this._animateLive(result.displayFn, result.loadTime || 120000, result.refreshMs || 2000);
+        this._liveMode = false;
+        this._busy = false;
+        this._writePrompt();
         return;
       }
 
@@ -186,12 +319,11 @@ function createTerminal() {
         this._busy = true;
         const cancelled = await this._animateLoad(result.loadTime, result.progressFn);
         this._busy = false;
-        if (cancelled) { this._updatePrompt(); return; }
+        if (cancelled) { this._writePrompt(); return; }
       }
 
-      this._printLines(result.lines || []);
-      this._updatePrompt();
-      this._scrollBottom();
+      if (result.lines) this._printLines(result.lines);
+      this._writePrompt();
 
       if (result.id) {
         const captured = CTF.check(result);
@@ -200,23 +332,22 @@ function createTerminal() {
     },
 
     async _runSudoCmd(pendingCmd) {
-      this._sudoPendingCmd = null;
-      this._prompt1El.style.display = '';
-      this._inputEl.parentElement.style.display = '';
-
+      this._sudoPendingCmd = null; this._inputBuf = '';
       const wasRoot = SIM.user === 'root';
       if (!wasRoot) SIM.user = 'root';
-
       const result = runCommand(pendingCmd);
-
-      const permanentRoot = /^(-i$|-s\s|su(\s|$))/.test(pendingCmd.trim());
+      const permanentRoot = /^(-i$|-s\s*$|su(\s|$))/.test(pendingCmd.trim());
       if (!wasRoot && !permanentRoot) SIM.user = 'kali';
+      if (!result) { this._writePrompt(); return; }
+      if (result.clear) { this._xterm.clear(); this._writePrompt(); return; }
 
-      if (!result) { this._updatePrompt(); return; }
-
-      if (result.clear) {
-        this._outputEl.innerHTML = '';
-        this._updatePrompt();
+      if (result.liveDisplay) {
+        this._busy = true;
+        this._liveMode = true;
+        await this._animateLive(result.displayFn, result.loadTime || 120000, result.refreshMs || 2000);
+        this._liveMode = false;
+        this._busy = false;
+        this._writePrompt();
         return;
       }
 
@@ -224,90 +355,80 @@ function createTerminal() {
         this._busy = true;
         const cancelled = await this._animateLoad(result.loadTime, result.progressFn);
         this._busy = false;
-        if (cancelled) { this._updatePrompt(); return; }
+        if (cancelled) { this._writePrompt(); return; }
       }
-
-      this._printLines(result.lines || []);
-      this._updatePrompt();
-      this._scrollBottom();
-
+      if (result.lines) this._printLines(result.lines);
+      this._writePrompt();
       if (result.id) {
         const captured = CTF.check(result);
         if (captured) CTF._renderSidebar();
       }
     },
 
-    _animateLoad(ms, progressFn) {
-      this._progressFn = progressFn || null;
-      this._loadStart  = Date.now();
-      this._loadTotal  = ms;
-
-      this._prompt1El.style.display = 'none';
-      this._inputEl.parentElement.style.display = 'none';
-      this._outputEl.focus();
-
+    // ── Live display (top/htop/watch) ───────────────────────────────────────
+    _animateLive(displayFn, maxMs, refreshMs) {
       return new Promise(resolve => {
-        const frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
-        const div = document.createElement('div');
-        div.className = 'tl d';
-        div.textContent = frames[0];
-        this._outputEl.appendChild(div);
-        this._scrollBottom();
+        let prevLineCount = 0;
+        let tick = 0;
 
-        let i = 0;
-        const iv = setInterval(() => {
-          div.textContent = frames[++i % frames.length];
-          this._scrollBottom();
-        }, 80);
+        const render = () => {
+          // Erase previous frame
+          if (prevLineCount > 0) {
+            this._xterm.write('\x1b[' + prevLineCount + 'A\x1b[J');
+          }
+          const lines = displayFn(tick++);
+          prevLineCount = 0;
+          for (const l of lines) {
+            const text = String(l.t ?? '');
+            const subLines = text.split('\n');
+            prevLineCount += subLines.length;
+            const color = this._clsColor(l.cls);
+            for (const sub of subLines) {
+              if (color) this._xterm.writeln(color + sub + '\x1b[0m');
+              else this._xterm.writeln(sub);
+            }
+          }
+        };
+
+        render();
+        const iv = setInterval(render, refreshMs);
 
         const finish = (cancelled) => {
           clearInterval(iv);
-          div.remove();
           this._loadCancel = null;
-          this._progressFn = null;
-          this._prompt1El.style.display = '';
-          this._inputEl.parentElement.style.display = '';
-          this._inputEl.focus();
+          // Clear the live frame before returning to shell
+          if (prevLineCount > 0) {
+            this._xterm.write('\x1b[' + prevLineCount + 'A\x1b[J');
+          }
+          if (cancelled) this._xterm.writeln('\x1b[90m^C\x1b[0m');
           resolve(cancelled);
         };
 
         this._loadCancel = () => finish(true);
-        setTimeout(() => finish(false), ms);
+        setTimeout(() => finish(false), maxMs);
       });
     },
 
-    _echoCommand(raw) {
-      const user  = SIM.user;
-      const home  = user === 'root' ? '/root' : '/home/kali';
-      const cwd   = SIM.cwd === home ? '~' : SIM.cwd;
-      const sigil = user === 'root' ? '#' : '$';
-      const div = document.createElement('div');
-      div.className = 'tl';
-      if (SIM.windowsShell) {
-        div.innerHTML = `<span style="color:#fbbf24">C:\\Windows\\system32&gt;</span> <span style="color:#e0e0e0">${this._esc(raw)}</span>`;
-      } else {
-        div.innerHTML =
-          `<span style="color:#a78bfa">┌──(</span><span style="color:#22c55e;font-weight:bold">${this._esc(user)}</span><span style="color:#a78bfa">㉿kali)-[</span><span style="color:#60a5fa">${this._esc(cwd)}</span><span style="color:#a78bfa">]</span>` +
-          `\n<span style="color:#a78bfa">└─</span><span style="color:#fff">${sigil} </span><span style="color:#e0e0e0">${this._esc(raw)}</span>`;
-      }
-      this._outputEl.appendChild(div);
-      this._scrollBottom();
+    _animateLoad(ms, progressFn) {
+      this._progressFn = progressFn || null;
+      this._loadStart  = Date.now();
+      this._loadTotal  = ms;
+      return new Promise(resolve => {
+        const frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+        let i = 0;
+        this._xterm.write(frames[0]);
+        const iv = setInterval(() => { this._xterm.write('\r' + frames[++i % frames.length]); }, 80);
+        const finish = (cancelled) => {
+          clearInterval(iv);
+          this._xterm.write('\r\x1b[K');
+          this._loadCancel = null; this._progressFn = null;
+          if (cancelled) this._xterm.writeln('\x1b[90m^C\x1b[0m');
+          resolve(cancelled);
+        };
+        this._loadCancel = () => finish(true);
+        setTimeout(() => finish(false), ms);
+      });
     },
-
-    _appendLine({ t, cls }) {
-      const div = document.createElement('div');
-      div.className = 'tl' + (cls ? ' ' + cls : '');
-      div.textContent = t;
-      this._outputEl.appendChild(div);
-      this._scrollBottom();
-    },
-
-    _printLines(lines) {
-      for (const l of lines) this._appendLine(l);
-    },
-
-    _scrollBottom() { this._outputEl.scrollTop = this._outputEl.scrollHeight; },
-    _esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); },
   };
 
   TERM_INSTANCES.push(inst);
