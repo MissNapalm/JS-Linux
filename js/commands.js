@@ -449,26 +449,12 @@ const HANDLERS = [
       else if (arg === '-') target = home;
       else if (arg.startsWith('/')) target = arg;
       else target = (SIM.cwd === '/' ? '' : SIM.cwd) + '/' + arg;
-      // /root is mode 700 — only root can enter
       if (SIM.user !== 'root' && (target === '/root' || target.startsWith('/root/'))) {
         return `bash: cd: ${arg}: Permission denied`;
       }
       SIM.cwd = target;
       return '';
-    }, cls: (cmd) => {
-      const home = SIM.user === 'root' ? '/root' : ('/home/' + SIM.user);
-      let arg = cmd.replace(/^cd\s*/, '').trim() || home;
-      if (arg === '~') arg = home;
-      else if (arg.startsWith('~/')) arg = home + arg.slice(1);
-      if (arg !== '/') arg = arg.replace(/\/+$/, '');
-      let target;
-      if (!arg || arg === home) target = home;
-      else if (arg === '..') target = SIM.cwd.split('/').slice(0, -1).join('/') || '/';
-      else if (arg === '-') target = home;
-      else if (arg.startsWith('/')) target = arg;
-      else target = (SIM.cwd === '/' ? '' : SIM.cwd) + '/' + arg;
-      return (SIM.user !== 'root' && (target === '/root' || target.startsWith('/root/'))) ? 'r' : '';
-    }}],
+    }, cls: '' }],
   },
 
   // ── rm -rf / easter egg ──────────────────────────────────────────────────────────────────────────

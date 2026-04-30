@@ -147,6 +147,10 @@ function createTerminal() {
 
     // ── Prompt ──────────────────────────────────────────────────────────────
     _writePrompt() {
+      if (this._windowsShell) {
+        this._xterm.write('\x1b[33m' + this._winCwd + '>\x1b[0m ');
+        return;
+      }
       if (SIM.msf) {
         if (SIM.msfMeterWin) {
           this._xterm.write('\x1b[33mC:\\Windows\\system32>\x1b[0m ');
@@ -158,10 +162,6 @@ function createTerminal() {
         } else {
           this._xterm.write('\x1b[1;31mmsf6\x1b[0m \x1b[31m>\x1b[0m ');
         }
-        return;
-      }
-      if (this._windowsShell) {
-        this._xterm.write('\x1b[33m' + this._winCwd + '>\x1b[0m ');
         return;
       }
       const user  = this._user || SIM.user;
