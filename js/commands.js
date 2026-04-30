@@ -473,16 +473,34 @@ const HANDLERS = [
 
   // ── mkdir / touch / rm ──────────────────────────────────────────────────────────────────────────
   {
-    match: c => /^(mkdir|touch|rm|cp|mv|chmod)\s/.test(c),
+    match: c => /^(mkdir|touch|rm|cp|mv|chmod)(\s|$)/.test(c),
     lines: [{ t: c => {
       const op = c.split(' ')[0];
-      const arg = c.replace(/^\S+\s+(-p\s+)?/, '').trim();
+      const arg = c.replace(/^\S+\s*(-p\s+)?/, '').trim();
+      if (!arg) return `${op}: missing operand`;
       const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/, '/') + arg;
       if (op === 'mkdir') { SIM.dirs.add(abs); return ''; }
       if (op === 'touch') { if (!SIM.files[abs]) SIM.files[abs] = ''; return ''; }
       if (op === 'rm') {
         if (c.includes('-rf') && arg === '/') return "rm: it is dangerous to operate recursively on '/'";
+        if (!SIM.files[abs] && !SIM.dirs.has(abs)) return `rm: cannot remove '${arg}': No such file or directory`;
         delete SIM.files[abs]; SIM.dirs.delete(abs); return '';
+      }
+      if (op === 'cp' || op === 'mv') {
+        const parts = c.split(/\s+/).slice(1).filter(p => !p.startsWith('-'));
+        if (parts.length < 2) return `${op}: missing destination`;
+        const src = parts[0].startsWith('/') ? parts[0] : SIM.cwd.replace(/\/?$/, '/') + parts[0];
+        const dst = parts[1].startsWith('/') ? parts[1] : SIM.cwd.replace(/\/?$/, '/') + parts[1];
+        if (SIM.files[src] !== undefined) {
+          SIM.files[dst] = SIM.files[src];
+          if (op === 'mv') delete SIM.files[src];
+        } else if (SIM.dirs.has(src)) {
+          SIM.dirs.add(dst);
+          if (op === 'mv') SIM.dirs.delete(src);
+        } else {
+          return `${op}: cannot stat '${parts[0]}': No such file or directory`;
+        }
+        return '';
       }
       return '';
     }}],
@@ -1367,16 +1385,34 @@ id: 'nmap-discovery',
 
   // ── mkdir / touch / rm / cp / mv ─────────────────────────────────────────────────────────────────
   {
-    match: c => /^(mkdir|touch|rm|cp|mv)\s/.test(c),
+    match: c => /^(mkdir|touch|rm|cp|mv)(\s|$)/.test(c),
     lines: [{ t: c => {
       const op = c.split(' ')[0];
-      const arg = c.replace(/^\S+\s+(-p\s+)?/, '').trim();
+      const arg = c.replace(/^\S+\s*(-p\s+)?/, '').trim();
+      if (!arg) return `${op}: missing operand`;
       const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/, '/') + arg;
       if (op === 'mkdir') { SIM.dirs.add(abs); return ''; }
       if (op === 'touch') { if (!SIM.files[abs]) SIM.files[abs] = ''; return ''; }
       if (op === 'rm') {
         if (c.includes('-rf') && arg === '/') return "rm: it is dangerous to operate recursively on '/'";
+        if (!SIM.files[abs] && !SIM.dirs.has(abs)) return `rm: cannot remove '${arg}': No such file or directory`;
         delete SIM.files[abs]; SIM.dirs.delete(abs); return '';
+      }
+      if (op === 'cp' || op === 'mv') {
+        const parts = c.split(/\s+/).slice(1).filter(p => !p.startsWith('-'));
+        if (parts.length < 2) return `${op}: missing destination`;
+        const src = parts[0].startsWith('/') ? parts[0] : SIM.cwd.replace(/\/?$/, '/') + parts[0];
+        const dst = parts[1].startsWith('/') ? parts[1] : SIM.cwd.replace(/\/?$/, '/') + parts[1];
+        if (SIM.files[src] !== undefined) {
+          SIM.files[dst] = SIM.files[src];
+          if (op === 'mv') delete SIM.files[src];
+        } else if (SIM.dirs.has(src)) {
+          SIM.dirs.add(dst);
+          if (op === 'mv') SIM.dirs.delete(src);
+        } else {
+          return `${op}: cannot stat '${parts[0]}': No such file or directory`;
+        }
+        return '';
       }
       return '';
     }}],

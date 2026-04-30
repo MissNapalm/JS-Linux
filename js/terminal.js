@@ -19,6 +19,9 @@ function createTerminal() {
     _inputBuf: '',
     _cursorPos: 0,
     _nano: null,
+    _tabMatches: null,
+    _tabIdx: -1,
+    _tabPrefix: '',
     // per-tab shell state (shadows SIM for isolation between tabs)
     _user: null,
     _cwd: null,
@@ -231,6 +234,9 @@ function createTerminal() {
       }
 
       // ── Normal input ────────────────────────────────────────────────────
+      // reset tab cycling on any non-tab input
+      if (data !== '\t') { this._tabMatches = null; this._tabIdx = -1; }
+
       if (data === '\x03') {
         if (this._xterm.getSelection()) { this._xterm.clearSelection(); return; }
         this._xterm.writeln('\x1b[90m^C\x1b[0m');
@@ -300,6 +306,18 @@ function createTerminal() {
       }
       // Tab completion
       if (data === '\t') {
+        // if we're mid-cycle, advance and apply next match silently
+        if (this._tabMatches) {
+          this._tabIdx = (this._tabIdx + 1) % this._tabMatches.length;
+          const spIdx = this._tabPrefix.lastIndexOf(' ');
+          const completed = (spIdx === -1 ? '' : this._tabPrefix.slice(0, spIdx + 1)) + this._tabMatches[this._tabIdx];
+          const curLen = this._inputBuf.length;
+          if (curLen > 0) this._xterm.write('\x1b[' + curLen + 'D');
+          this._xterm.write('\x1b[K' + completed);
+          this._inputBuf = completed;
+          this._cursorPos = completed.length;
+          return;
+        }
         const buf = this._inputBuf.slice(0, this._cursorPos);
         // ── filename/dir completion ───────────────────────────────────────────────────────────────────────────
         // Build entries for a directory — mirrors the ls handler
@@ -413,17 +431,26 @@ function createTerminal() {
             const completed = prefix + dirPart + matches[0];
             this._inputBuf = completed;
             this._cursorPos = completed.length;
-            // redraw: move to start of input, erase, rewrite
             if (buf.length > 0) this._xterm.write('\x1b[' + buf.length + 'D');
             this._xterm.write('\x1b[K' + completed);
             return;
           } else if (matches.length > 1) {
-            this._xterm.writeln('');
-            this._writeLine(matches.join('  '), 'd');
-            this._writePrompt();
-            this._xterm.write(buf);
-            this._cursorPos = buf.length;
+            const prefix = buf.slice(0, spaceIdx === -1 ? 0 : spaceIdx + 1);
+            const baseToken = prefix + dirPart + filePart;
+            this._tabMatches = matches;
+            this._tabIdx = 0;
+            this._tabPrefix = baseToken;
+            // print list on next line, then move cursor back up — input unchanged
+            this._xterm.write('\r\n\x1b[90m' + matches.join('    ') + '\x1b[0m');
+            this._xterm.write('\x1b[1A\r');  // move up 1 line, carriage return
+            // rewrite the current input line so cursor is at end of buf
+            this._xterm.write('\x1b[K');  // clear to end of line (clears any leftover)
+            // rewrite prompt sigil + input (we're on the └─$ line)
+            const u3 = this._user || SIM.user;
+            const sig3 = u3 === 'root' ? '#' : '$';
+            this._xterm.write('\x1b[35m\u2514\u2500\x1b[0m\x1b[97m' + sig3 + ' \x1b[0m' + buf);
             this._inputBuf = buf;
+            this._cursorPos = buf.length;
             return;
           }
         }

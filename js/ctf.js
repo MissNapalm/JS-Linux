@@ -5,7 +5,7 @@ const KERBEROAST_CHALLENGES = [
   {
     id: 1, title: 'Port Scan the DC', pts: 100,
     flag: 'FLAG{dc01_discovered_ports_445_88_389}',
-    hint: 'sudo nmap -sV -sC -p- 10.10.10.10',
+    hint: 'sudo nmap -sV -sC 10.10.10.10',
     explain: 'Nmap scans a target to find open ports — think of it like knocking on every door to see which ones open. The flags -sV and -sC make it also identify what service is running and grab extra info automatically. -p- scans all 65,535 ports so nothing is missed. On a Domain Controller you\'ll see ports like 88 (Kerberos login), 389 (LDAP directory), and 445 (file sharing) — a clear sign this is a Windows AD server. This first scan tells us what we\'re dealing with.',
     done: false,
     check: r => r.id === 'nmap-full',
