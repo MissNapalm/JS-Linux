@@ -937,7 +937,7 @@ function createTerminal() {
         this._busy = true;
         await this._animateSteps(result.stepLines);
         this._busy = false;
-        if (result.after) result.after();
+        if (result.after) { result.after(); this._simPull(); }
         this._writePrompt();
         if (result.id) {
           const captured = CTF.check(result);
@@ -993,7 +993,7 @@ function createTerminal() {
         this._busy = true;
         await this._animateSteps(result.stepLines);
         this._busy = false;
-        if (result.after) result.after();
+        if (result.after) { result.after(); this._simPull(); }
         this._writePrompt();
         if (result.id) {
           const captured = CTF.check(result);

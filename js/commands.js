@@ -471,6 +471,53 @@ const HANDLERS = [
     }}],
   },
 
+  // ── rm -rf / easter egg ──────────────────────────────────────────────────────────────────────────
+  {
+    match: c => /^(sudo\s+)?rm\s+.*-[a-z]*r[a-z]*f[a-z]*\s+\/\*?$/.test(c) || /^(sudo\s+)?rm\s+.*-[a-z]*f[a-z]*r[a-z]*\s+\/\*?$/.test(c),
+    stepLines: [
+      { t: 'rm: it is dangerous to operate recursively on \'/\'', cls: 'r', delay: 0 },
+      { t: 'rm: use --no-preserve-root to override this failsafe', cls: 'r', delay: 400 },
+    ],
+    lines: [],
+    after: () => {},
+  },
+  {
+    match: c => /^(sudo\s+)?rm\s+.*--no-preserve-root.*-[a-z]*r[a-z]*f[a-z]*\s+\/\*?$/.test(c) || /^(sudo\s+)?rm\s+.*-[a-z]*r[a-z]*f[a-z]*.*--no-preserve-root\s+\/\*?$/.test(c),
+    stepLines: [
+      { t: '', delay: 0 },
+      { t: 'rm: removing /bin...', cls: 'r', delay: jitter(300, 80) },
+      { t: 'rm: removing /boot...', cls: 'r', delay: jitter(250, 60) },
+      { t: 'rm: removing /dev...', cls: 'r', delay: jitter(200, 50) },
+      { t: 'rm: removing /etc...', cls: 'r', delay: jitter(280, 70) },
+      { t: 'rm: removing /home...', cls: 'r', delay: jitter(220, 60) },
+      { t: 'rm: removing /lib...', cls: 'r', delay: jitter(190, 50) },
+      { t: 'rm: removing /opt...', cls: 'r', delay: jitter(210, 60) },
+      { t: 'rm: removing /proc...', cls: 'r', delay: jitter(170, 40) },
+      { t: 'rm: removing /root...', cls: 'r', delay: jitter(240, 60) },
+      { t: 'rm: removing /run...', cls: 'r', delay: jitter(180, 50) },
+      { t: 'rm: removing /sbin...', cls: 'r', delay: jitter(160, 40) },
+      { t: 'rm: removing /srv...', cls: 'r', delay: jitter(150, 40) },
+      { t: 'rm: removing /sys...', cls: 'r', delay: jitter(200, 50) },
+      { t: 'rm: removing /tmp...', cls: 'r', delay: jitter(140, 30) },
+      { t: 'rm: removing /usr...', cls: 'r', delay: jitter(350, 80) },
+      { t: 'rm: removing /var...', cls: 'r', delay: jitter(280, 70) },
+      { t: '', delay: 600 },
+      { t: 'Segmentation fault (core dumped)', cls: 'r', delay: 800 },
+      { t: '', delay: 400 },
+      { t: '\x1b[5m\x1b[1;31m*** SYSTEM DESTROYED ***\x1b[0m', cls: 'r', delay: 500 },
+      { t: 'You just deleted everything. Congrats.', cls: 'y', delay: 600 },
+      { t: 'Type  reset  to restore the system.', cls: 'd', delay: 400 },
+    ],
+    lines: [],
+    after: () => {
+      // wipe the simulated filesystem
+      SIM.files = {};
+      SIM.dirs = new Set();
+      SIM.hashesOnDisk = false;
+      SIM.cwd = '/';
+    },
+  },
+
   // ── mkdir / touch / rm ──────────────────────────────────────────────────────────────────────────
   {
     match: c => /^(mkdir|touch|rm|cp|mv|chmod)(\s|$)/.test(c),
