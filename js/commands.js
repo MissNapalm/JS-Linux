@@ -53,9 +53,15 @@ $krb5tgs$23$*svc_web$CORP.LOCAL$HTTP/web.corp.local*$7c5d4e3f2a1b0c9d8e7f6a5b4c3
 
 const HANDLERS = [
 
-  // ── sudo <editor> — skip password, just refuse ───────────────────────────
+  // ── sudo nano/vim — allow through to editor ────────────────────────────
   {
-    match: c => /^sudo\s+(nano|vim?|gedit|emacs|micro)\b/.test(c),
+    match: c => /^sudo\s+(nano|vim?)\b/.test(c),
+    waitSudo: true,
+    lines: [],
+  },
+  // ── sudo <other editors> — refuse ────────────────────────────────────────
+  {
+    match: c => /^sudo\s+(gedit|emacs|micro)\b/.test(c),
     lines: [{ t: (c) => `${c.replace(/^sudo\s+/, '').split(' ')[0]}: interactive editors not supported in this simulation`, cls: 'y' }],
   },
 
@@ -946,9 +952,20 @@ const HANDLERS = [
     lines: [{ t: '(simulation — nc not interactive)', cls: 'd' }],
   },
 
-  // ── nano / vim / vi ───────────────────────────────────────────────────────
+  // ── nano / vim ──────────────────────────────────────────────────────────────────────────────
   {
-    match: c => /^(nano|vim?|gedit|emacs|micro)\b/.test(c),
+    match: c => /^(nano|vim?)\b/.test(c),
+    lines: [{ t: (c) => {
+      const arg = c.replace(/^(nano|vim?)\s*/, '').trim();
+      if (!arg) return 'Usage: nano <filename>';
+      const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/, '/') + arg;
+      const content = simFiles()[abs] !== undefined ? simFiles()[abs] : '';
+      return { openEditor: true, filename: arg, filepath: abs, content };
+    }}],
+  },
+  // ── other editors ───────────────────────────────────────────────────────────────────────────
+  {
+    match: c => /^(gedit|emacs|micro)\b/.test(c),
     lines: [{ t: (c) => `${c.split(' ')[0]}: interactive editors not supported in this simulation`, cls: 'y' }],
   },
 
@@ -2584,6 +2601,10 @@ function runCommand(rawInput) {
         t: typeof l.t === 'function' ? l.t(cmd) : l.t,
         cls: typeof l.cls === 'function' ? l.cls(cmd) : (l.cls || ''),
       }));
+      // openEditor result — returned as object inside lines[0].t
+      if (lines.length === 1 && lines[0].t && typeof lines[0].t === 'object' && lines[0].t.openEditor) {
+        return lines[0].t;
+      }
       const loadTime = typeof h.loadTime === 'function' ? h.loadTime(cmd) : (h.loadTime || 0);
       return { id: h.id || null, lines, event, loadTime, progressFn: h.progressFn || null,
                liveDisplay: h.liveDisplay || false, displayFn: h.displayFn || null, refreshMs: h.refreshMs || 2000 };

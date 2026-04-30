@@ -298,11 +298,12 @@ function createTerminal() {
     },
 
     // ── Nano editor ──────────────────────────────────────────────────────────
-    _nanoOpen(filename, content) {
+    _nanoOpen(filename, content, filepath) {
       const cols = this._xterm.cols || 80;
       const rows = this._xterm.rows || 24;
       this._nano = {
         filename,
+        filepath: filepath || (filename.startsWith('/') ? filename : SIM.cwd.replace(/\/?$/, '/') + filename),
         lines: content.split('\n'),
         cx: 0,       // cursor col in current line
         cy: 0,       // cursor row in lines[]
@@ -421,6 +422,7 @@ function createTerminal() {
           if (fname) {
             n.filename = fname;
             const abs = fname.startsWith('/') ? fname : SIM.cwd.replace(/\/?$/, '/') + fname;
+            n.filepath = abs;
             SIM.files[abs] = n.lines.join('\n');
             n.dirty = false;
             n._statusMsg = `Wrote ${n.lines.length} lines`;
@@ -711,6 +713,11 @@ function createTerminal() {
         return;
       }
 
+      if (result.openEditor) {
+        this._nanoOpen(result.filename, result.content, result.filepath);
+        return;
+      }
+
       if (result.liveDisplay) {
         this._busy = true;
         this._liveMode = true;
@@ -746,6 +753,11 @@ function createTerminal() {
       if (!wasRoot && !permanentRoot) SIM.user = 'kali';
       if (!result) { this._writePrompt(); return; }
       if (result.clear) { this._xterm.clear(); this._writePrompt(); return; }
+
+      if (result.openEditor) {
+        this._nanoOpen(result.filename, result.content, result.filepath);
+        return;
+      }
 
       if (result.liveDisplay) {
         this._busy = true;
