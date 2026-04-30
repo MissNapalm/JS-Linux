@@ -18,7 +18,7 @@ john.doe:Password1!
 # ---
 john.doe:Password1!
 # TODO: rotate these after project ends`,
-    '/home/kali/.bash_history': `sudo nmap -sn 10.10.10.0/24\nsudo nmap -sV -sC -p- 10.10.10.10\nenum4linux -a 10.10.10.10`,
+    '/home/kali/.bash_history': `sudo nmap -sn 10.10.10.0/24\nsudo nmap -sV -sC 10.10.10.10\nenum4linux -a 10.10.10.10`,
     '/etc/hosts': `127.0.0.1   localhost\n10.10.10.5  kali\n10.10.10.10 DC01.CORP.LOCAL`,
     '/etc/passwd': `root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\nkali:x:1000:1000:Kali,,,:/home/kali:/bin/bash`,
     '/etc/os-release': `PRETTY_NAME="Kali GNU/Linux Rolling"\nNAME="Kali GNU/Linux"\nID=kali\nID_LIKE=debian\nVERSION="2024.2"\nHOME_URL="https://www.kali.org/"`,
@@ -396,7 +396,7 @@ const HANDLERS = [
   },
   {
     id: 'nmap-full',
-    loadTime: () => jitter(14000, 3000),
+    loadTime: () => jitter(28000, 5000),
     progressFn: (elapsed, total) => {
       const elSec  = Math.floor(elapsed / 1000);
       const elMin  = Math.floor(elSec / 60);
@@ -442,7 +442,7 @@ const HANDLERS = [
       { t: '' },
       { t: 'Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows' },
       { t: '' },
-      { t: 'Nmap done: 1 IP address (1 host up) scanned in 127.34 seconds', cls: 'g' },
+      { t: 'Nmap done: 1 IP address (1 host up) scanned in 28.41 seconds', cls: 'g' },
     ],
   },
 
@@ -959,29 +959,30 @@ const HANDLERS = [
       const now = new Date(Date.now() + tick * 2000);
       const hms = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
       const upM = String(13 + Math.floor(tick * 2 / 60)).padStart(2, '0');
-      const upS = String((tick * 2) % 60).padStart(2, '0'); // used below in uptime display
+      const upS = String((tick * 2) % 60).padStart(2, '0');
       const r = (v, d) => Math.max(0, v + (Math.random() * d * 2 - d));
-      const us = r(2.3, 0.3).toFixed(1);
-      const sy = r(0.8, 0.15).toFixed(1);
-      const id = Math.max(0, 100 - parseFloat(us) - parseFloat(sy) - 0.2).toFixed(1);
-      const memFree = r(4231.5, 12).toFixed(1);
-      const memUsed = r(2847.3, 8).toFixed(1);
-      const la1  = r(0.15, 0.05).toFixed(2);
-      const la5  = r(0.22, 0.04).toFixed(2);
-      const la15 = r(0.18, 0.03).toFixed(2);
+      const us = r(8.4, 2.5).toFixed(1);
+      const sy = r(3.1, 0.8).toFixed(1);
+      const wa = r(0.4, 0.3).toFixed(1);
+      const id = Math.max(0, 100 - parseFloat(us) - parseFloat(sy) - parseFloat(wa)).toFixed(1);
+      const memFree = r(3821.5, 40).toFixed(1);
+      const memUsed = r(3254.3, 30).toFixed(1);
+      const la1  = r(0.72, 0.15).toFixed(2);
+      const la5  = r(0.58, 0.10).toFixed(2);
+      const la15 = r(0.41, 0.08).toFixed(2);
       const nmT = `0:0${3 + Math.floor(tick / 30)}.${String((21 + tick) % 100).padStart(2,'0')}`;
-      const baT = `0:00.${String((44 + tick * 2) % 100).padStart(2,'0')}`;
+      const baT = `0:0${Math.floor((44 + tick * 3) / 100)}.${String((44 + tick * 3) % 100).padStart(2,'0')}`;
       const toT = `0:00.${String(tick % 100).padStart(2,'0')}`;
       return [
         { t: `top - ${hms} up  2:${upM}:${upS},  1 user,  load average: ${la1}, ${la5}, ${la15}` },
         { t: `Tasks: \x1b[97m142\x1b[0m total,   \x1b[32m1\x1b[0m running, \x1b[0m141\x1b[0m sleeping,   0 stopped,   0 zombie` },
-        { t: `%Cpu(s): \x1b[32m${String(us).padStart(4)} us\x1b[0m, \x1b[31m${String(sy).padStart(4)} sy\x1b[0m,  0.0 ni, \x1b[90m${String(id).padStart(5)} id\x1b[0m,  0.2 wa,  0.0 hi,  0.0 si,  0.0 st` },
-        { t: `\x1b[94mMiB Mem\x1b[0m :   8192.0 total,  ${String(memFree).padStart(7)} free,  \x1b[33m${String(memUsed).padStart(7)} used\x1b[0m,   1113.2 buff/cache` },
-        { t: `\x1b[94mMiB Swap\x1b[0m:   2048.0 total,   2048.0 free,      0.0 used.   5061.0 avail Mem` },
+        { t: `%Cpu(s): \x1b[32m${String(us).padStart(4)} us\x1b[0m, \x1b[31m${String(sy).padStart(4)} sy\x1b[0m,  0.0 ni, \x1b[90m${String(id).padStart(5)} id\x1b[0m,  ${wa} wa,  0.0 hi,  0.0 si,  0.0 st` },
+        { t: `\x1b[94mMiB Mem\x1b[0m :   8192.0 total,  ${String(memFree).padStart(7)} free,  \x1b[33m${String(memUsed).padStart(7)} used\x1b[0m,   ${(8192 - parseFloat(memFree) - parseFloat(memUsed)).toFixed(1)} buff/cache` },
+        { t: `\x1b[94mMiB Swap\x1b[0m:   2048.0 total,   2048.0 free,      0.0 used.   ${(8192 - parseFloat(memUsed)).toFixed(1)} avail Mem` },
         { t: '' },
         { t: `\x1b[7m    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND                              \x1b[0m` },
         { t: `    432 root      20   0  545928  24568  18844 S  \x1b[33m${String(us).padStart(4)}\x1b[0m   0.3   ${nmT} NetworkManager` },
-        { t: `   1234 ${SIM.user.padEnd(9)} 20   0   11936   5192   3824 S   0.3   0.1   ${baT} bash` },
+        { t: `   1234 ${SIM.user.padEnd(9)} 20   0   11936   5192   3824 S  \x1b[32m${r(2.1,0.8).toFixed(1).padStart(4)}\x1b[0m   0.1   ${baT} bash` },
         { t: `      1 root      20   0  168796  13132   8392 S   0.0   0.2   0:02.14 systemd` },
         { t: `      2 root      20   0       0      0      0 S   0.0   0.0   0:00.01 [kthreadd]` },
         { t: `      3 root      20   0       0      0      0 I   0.0   0.0   0:00.00 [rcu_gp]` },
@@ -1006,11 +1007,11 @@ const HANDLERS = [
     refreshMs: 2000,
     displayFn: (tick) => {
       const r  = (v, d) => Math.max(0, v + (Math.random() * d * 2 - d));
-      const cpuPct  = r(18.5, 3.5);
-      const memUsedM = Math.round(r(2847, 15));
-      const la1  = r(0.15, 0.05).toFixed(2);
-      const la5  = r(0.22, 0.04).toFixed(2);
-      const la15 = r(0.18, 0.03).toFixed(2);
+      const cpuPct  = r(11.5, 3.0);
+      const memUsedM = Math.round(r(3254, 40));
+      const la1  = r(0.72, 0.15).toFixed(2);
+      const la5  = r(0.58, 0.10).toFixed(2);
+      const la15 = r(0.41, 0.08).toFixed(2);
       const upM  = String(13 + Math.floor(tick * 2 / 60)).padStart(2,'0');
       const upS  = String((tick * 2) % 60).padStart(2,'0');
       const toT  = `0:00.${String(tick % 100).padStart(2,'0')}`;
@@ -1035,7 +1036,7 @@ const HANDLERS = [
         { t: '' },
         { t: `\x1b[1;30;47m  PID USER       PRI  NI  VIRT   RES   SHR S CPU%  MEM%   TIME+   Command                              \x1b[0m` },
         { t: `  432 \x1b[32mroot\x1b[0m        20   0  533M 24568 18844 S ${String(cpuPct.toFixed(1)).padStart(5)}  0.3  0:03.21 \x1b[32mNetworkManager\x1b[0m` },
-        { t: ` 1234 \x1b[32m${SIM.user.padEnd(10)}\x1b[0m 20   0 11936  5192  3824 S  0.3   0.1  0:00.44 \x1b[32mbash\x1b[0m` },
+        { t: ` 1234 \x1b[32m${SIM.user.padEnd(10)}\x1b[0m 20   0 11936  5192  3824 S  ${r(2.1,0.8).toFixed(1).padStart(4)}   0.1  ${`0:0${Math.floor((44 + tick * 3)/100)}.${String((44 + tick * 3) % 100).padStart(2,'0')}`} \x1b[32mbash\x1b[0m` },
         { t: `    1 \x1b[32mroot\x1b[0m        20   0  165M 13132  8392 S  0.0   0.2  0:02.14 \x1b[90m/sbin/init\x1b[0m` },
         { t: `    2 \x1b[32mroot\x1b[0m         0 -20     0     0     0 I  0.0   0.0  0:00.01 \x1b[90m[kthreadd]\x1b[0m` },
         { t: `  591 \x1b[32mroot\x1b[0m        20   0 12312  7712  6448 S  0.0   0.1  0:00.08 \x1b[36msshd\x1b[0m` },
@@ -1494,7 +1495,7 @@ const HANDLERS = [
       { t: 'Jan 15 12:10:03 kali gdm-launch-environment[811]: pam_unix(gdm-launch-environment:session): session opened for user gdm(uid=115) by (uid=0)' },
       { t: 'Jan 15 12:10:15 kali sudo[1022]: pam_unix(sudo:auth): authentication failure; logname=kali uid=1000 euid=0 tty=/dev/pts/0 ruser=kali rhost=  user=kali', cls: 'y' },
       { t: 'Jan 15 12:10:20 kali sudo[1023]:     kali : TTY=pts/0 ; PWD=/home/kali ; USER=root ; COMMAND=/usr/bin/nmap -sn 10.10.10.0/24', cls: 'b' },
-      { t: 'Jan 15 14:18:04 kali sudo[1289]:     kali : TTY=pts/0 ; PWD=/home/kali ; USER=root ; COMMAND=/usr/bin/nmap -sV -sC -p- 10.10.10.10', cls: 'b' },
+      { t: 'Jan 15 14:18:04 kali sudo[1289]:     kali : TTY=pts/0 ; PWD=/home/kali ; USER=root ; COMMAND=/usr/bin/nmap -sV -sC 10.10.10.10', cls: 'b' },
       { t: 'Jan 15 14:22:31 kali sudo[1421]:     kali : TTY=pts/0 ; PWD=/home/kali ; USER=root ; COMMAND=/usr/sbin/john hashes.kerberoast --wordlist=/usr/share/wordlists/rockyou.txt', cls: 'b' },
       { t: '-- No entries -- (use journalctl --no-pager for full output)', cls: 'd' },
     ],
@@ -2319,7 +2320,7 @@ const HANDLERS = [
       { t: '└─────────────────────────────────────────────────────┘', cls: 'p' },
       { t: '' },
       { t: 'STEP 1  sudo nmap -sn 10.10.10.0/24', cls: 'c' },
-      { t: 'STEP 2  sudo nmap -sV -sC -p- 10.10.10.10', cls: 'c' },
+      { t: 'STEP 2  sudo nmap -sV -sC 10.10.10.10', cls: 'c' },
       { t: 'STEP 3  enum4linux -a 10.10.10.10', cls: 'c' },
       { t: 'STEP 4  cat /home/kali/notes.txt', cls: 'c' },
       { t: '        crackmapexec smb 10.10.10.10 -u john.doe -p \'Password1!\'', cls: 'c' },

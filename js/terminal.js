@@ -50,6 +50,7 @@ function createTerminal() {
         cursorStyle: 'block',
         scrollback: 2000,
         convertEol: true,
+        copyOnSelect: true,
       });
 
       if (FitClass) {
@@ -186,6 +187,7 @@ function createTerminal() {
 
       // ── Normal input ────────────────────────────────────────────────────
       if (data === '\x03') {
+        if (this._xterm.getSelection()) { this._xterm.clearSelection(); return; }
         this._xterm.writeln('\x1b[90m^C\x1b[0m');
         this._inputBuf = ''; this._cursorPos = 0;
         this._writePrompt(); return;
@@ -267,17 +269,18 @@ function createTerminal() {
         if (match) this._setInput(match);
         return;
       }
-      // Printable chars
-      if (data.length === 1 && data >= ' ') {
-        if (this._cursorPos === this._inputBuf.length) {
-          this._inputBuf += data; this._cursorPos++;
-          this._xterm.write(data);
+      // Printable chars (including multi-char paste)
+      if (data.length >= 1 && (data.length > 1 || data >= ' ')) {
+        const printable = data.replace(/[\x00-\x1f\x7f]/g, '');
+        if (!printable) return;
+        const before = this._inputBuf.slice(0, this._cursorPos);
+        const after  = this._inputBuf.slice(this._cursorPos);
+        this._inputBuf = before + printable + after;
+        this._cursorPos += printable.length;
+        if (after.length === 0) {
+          this._xterm.write(printable);
         } else {
-          const before = this._inputBuf.slice(0, this._cursorPos);
-          const after  = this._inputBuf.slice(this._cursorPos);
-          this._inputBuf = before + data + after;
-          this._cursorPos++;
-          this._xterm.write(data + after + '\x1b[' + after.length + 'D');
+          this._xterm.write(printable + after + '\x1b[' + after.length + 'D');
         }
       }
     },
