@@ -5,6 +5,7 @@ const SIM = {
   cwd: '/home/kali',
   user: 'kali',          // 'kali' or 'root'
   windowsShell: false,
+  winCwd: 'C:\\Windows\\system32',
   hashesOnDisk: false,
   lootExfiltrated: false,
   files: {
@@ -702,7 +703,7 @@ const HANDLERS = [
       { t: '' },
       { t: 'C:\\Windows\\system32> ', cls: 'p' },
     ],
-    after: () => { SIM.windowsShell = true; },
+    after: () => { SIM.windowsShell = true; SIM.winCwd = 'C:\\Windows\\system32'; },
   },
 
   // ── gobuster / dirb ───────────────────────────────────────────────────────
@@ -2380,7 +2381,45 @@ function runCommand(rawInput) {
 
   // Windows shell mode (after psexec)
   if (SIM.windowsShell) {
-    if (cmd === 'exit') { SIM.windowsShell = false; return { lines: [{ t: '' }] }; }
+    if (cmd === 'exit') {
+      SIM.windowsShell = false;
+      SIM.winCwd = 'C:\\Windows\\system32';
+      return { lines: [{ t: '' }] };
+    }
+
+    // ── cd ───────────────────────────────────────────────────────────────────
+    if (/^cd(\s|$)/i.test(cmd)) {
+      const arg = cmd.replace(/^cd\s*/i, '').trim();
+      if (!arg || arg === '\\') { SIM.winCwd = 'C:\\'; return { lines: [{ t: '' }] }; }
+      // Resolve path
+      const resolve = (base, rel) => {
+        if (/^[A-Za-z]:\\/.test(rel)) return rel.replace(/\\+$/, '') || rel; // absolute
+        if (rel === '..') {
+          const parts = base.replace(/\\+$/, '').split('\\');
+          return parts.length > 1 ? parts.slice(0, -1).join('\\') || 'C:\\' : base;
+        }
+        return (base.replace(/\\+$/, '') + '\\' + rel).replace(/\\{2,}/g, '\\');
+      };
+      const target = resolve(SIM.winCwd, arg);
+      // Validate against known dirs
+      const knownDirs = [
+        'C:\\', 'C:\\Windows', 'C:\\Windows\\system32', 'C:\\Windows\\system32\\config',
+        'C:\\Users', 'C:\\Users\\Administrator', 'C:\\Users\\Administrator\\Desktop',
+        'C:\\Users\\Administrator\\Documents', 'C:\\Users\\Administrator\\Downloads',
+        'C:\\Program Files', 'C:\\Program Files (x86)',
+        'C:\\CORP_DATA', 'C:\\CORP_DATA\\Finance', 'C:\\CORP_DATA\\HR',
+        'C:\\CORP_DATA\\Customer', 'C:\\CORP_DATA\\IT',
+        'C:\\inetpub', 'C:\\inetpub\\wwwroot',
+        'C:\\Windows\\NTDS', 'C:\\Windows\\SYSVOL',
+      ];
+      const match = knownDirs.find(d => d.toLowerCase() === target.toLowerCase());
+      if (match) {
+        SIM.winCwd = match;
+        return { lines: [{ t: '' }] };
+      }
+      return { lines: [{ t: `The system cannot find the path specified.`, cls: 'r' }] };
+    }
+
     if (cmd === 'whoami') return { lines: [{ t: 'nt authority\\system', cls: 'g' }] };
     if (cmd === 'whoami /priv') return { lines: [
       { t: 'PRIVILEGES INFORMATION' }, { t: '----------------------' }, { t: '' },
@@ -2412,89 +2451,108 @@ function runCommand(rawInput) {
       { t: '*Administrators          *Backup Operators        *Domain Admins' },
       { t: '*Domain Users            *Remote Desktop Users' },
     ]};
-    // ── CORP_DATA loot ──────────────────────────────────────────────────────
-    if (/^dir\s+C:\\CORP_DATA\s*$/i.test(cmd)) return { lines: [
-      { t: ' Volume in drive C has no label.  Volume Serial Number is 1337-D34D' },
-      { t: '' },
-      { t: ' Directory of C:\\CORP_DATA', cls: 'b' }, { t: '' },
-      { t: '01/15/2024  09:12 AM    <DIR>          .' },
-      { t: '01/15/2024  09:12 AM    <DIR>          ..' },
-      { t: '12/31/2023  11:59 PM    <DIR>          Finance', cls: 'y' },
-      { t: '01/01/2024  12:00 AM    <DIR>          HR', cls: 'y' },
-      { t: '01/12/2024  03:22 PM    <DIR>          Customer', cls: 'r' },
-      { t: '01/13/2024  02:11 PM    <DIR>          IT', cls: 'y' },
-      { t: '               0 File(s)              0 bytes' },
-      { t: '               4 Dir(s)  32,456,789,120 bytes free' },
-    ]};
-    if (/^dir\s+C:\\CORP_DATA\\Finance/i.test(cmd)) return { lines: [
-      { t: ' Directory of C:\\CORP_DATA\\Finance', cls: 'b' }, { t: '' },
-      { t: '12/31/2023  11:59 PM     2,349,012     Q4_2023_Revenue_Final.xlsx', cls: 'y' },
-      { t: '12/31/2023  11:59 PM       982,034     Annual_Budget_2024.xlsx', cls: 'y' },
-      { t: '01/10/2024  08:45 AM       450,123     Payroll_Jan2024.xlsx', cls: 'y' },
-      { t: '               3 File(s)      3,781,169 bytes' },
-    ]};
-    if (/^dir\s+C:\\CORP_DATA\\HR/i.test(cmd)) return { lines: [
-      { t: ' Directory of C:\\CORP_DATA\\HR', cls: 'b' }, { t: '' },
-      { t: '01/01/2024  12:00 AM    12,492,048     All_Employees_PII.csv', cls: 'r' },
-      { t: '01/01/2024  12:00 AM       823,440     Salary_Database_2024.xlsx', cls: 'r' },
-      { t: '               2 File(s)     13,315,488 bytes' },
-    ]};
-    if (/^dir\s+C:\\CORP_DATA\\Customer/i.test(cmd)) return { lines: [
-      { t: ' Directory of C:\\CORP_DATA\\Customer', cls: 'b' }, { t: '' },
-      { t: '01/12/2024  03:22 PM    89,234,502     Credit_Card_Database.csv', cls: 'r' },
-      { t: '01/14/2024  11:30 AM     4,128,903     Loyalty_Members.csv', cls: 'y' },
-      { t: '               2 File(s)     93,363,405 bytes' },
-    ]};
-    if (/^dir\s+C:\\CORP_DATA\\IT/i.test(cmd)) return { lines: [
-      { t: ' Directory of C:\\CORP_DATA\\IT', cls: 'b' }, { t: '' },
-      { t: '12/20/2023  04:15 PM         4,832     VPN_Credentials.txt', cls: 'r' },
-      { t: '01/05/2024  10:22 AM        32,840     Network_Diagram.vsdx', cls: 'y' },
-      { t: '01/13/2024  02:11 PM       128,934     Backup_Schedule.xlsx', cls: 'y' },
-      { t: '               3 File(s)        166,606 bytes' },
-    ]};
-    if (/type.*Credit_Card_Database/i.test(cmd)) {
-      SIM.lootExfiltrated = true;
-      return { id: 'loot-exfil', lines: [
-        { t: 'CustomerID,FirstName,LastName,Email,CardNumber,CVV,ExpDate,SSN', cls: 'b' },
-        { t: '10001,James,Wilson,j.wilson@email.com,4532-1234-5678-9012,341,03/27,123-45-6789', cls: 'g' },
-        { t: '10002,Sarah,Chen,s.chen@email.com,5412-7534-1234-5678,229,08/25,234-56-7890', cls: 'g' },
-        { t: '10003,Robert,Martinez,r.martinez@email.com,4916-8765-4321-0987,512,12/26,345-67-8901', cls: 'g' },
-        { t: '10004,Emily,Johnson,e.johnson@email.com,3782-822463-10005,091,06/28,456-78-9012', cls: 'g' },
-        { t: '10005,David,Kim,d.kim@email.com,6011-9876-5432-1098,774,11/25,567-89-0123', cls: 'g' },
-        { t: '...', cls: 'd' },
-        { t: '[23,452 records total — Credit_Card_Database.csv  (89.2 MB)]', cls: 'y' },
+
+    // ── dir ──────────────────────────────────────────────────────────────────
+    if (/^dir(\s|$)/i.test(cmd)) {
+      // Explicit path arg overrides cwd
+      const arg = cmd.replace(/^dir\s*/i, '').trim().replace(/\/[a-z]/gi, '').trim();
+      const target = arg || SIM.winCwd;
+      const t = target.toLowerCase().replace(/\\+$/, '');
+      const dirMap = {
+        'c:':                         [['<DIR>','Windows'],['<DIR>','Users'],['<DIR>','Program Files'],['<DIR>','Program Files (x86)'],['<DIR>','inetpub'],['<DIR>','CORP_DATA']],
+        'c:\\':                       [['<DIR>','Windows'],['<DIR>','Users'],['<DIR>','Program Files'],['<DIR>','Program Files (x86)'],['<DIR>','inetpub'],['<DIR>','CORP_DATA']],
+        'c:\\windows':                [['<DIR>','system32'],['<DIR>','SysWOW64'],['<DIR>','NTDS'],['<DIR>','SYSVOL'],['<DIR>','Temp'],['<DIR>','inf']],
+        'c:\\windows\\system32':       [['<DIR>','config'],['<DIR>','drivers'],['<DIR>','wbem'],['32,768','cmd.exe'],['45,056','net.exe'],['36,864','whoami.exe'],['28,672','ipconfig.exe']],
+        'c:\\windows\\system32\\config':[['262,144','SAM'],['262,144','SECURITY'],['786,432','SOFTWARE'],['1,048,576','SYSTEM'],['32,768','DEFAULT']],
+        'c:\\windows\\ntds':           [['18,874,368','ntds.dit'],['1,048,576','edb.log'],['8,192','edb.chk']],
+        'c:\\windows\\sysvol':         [['<DIR>','domain'],['<DIR>','staging'],['<DIR>','sysvol']],
+        'c:\\users':                  [['<DIR>','Administrator'],['<DIR>','Default'],['<DIR>','Public']],
+        'c:\\users\\administrator':    [['<DIR>','Desktop'],['<DIR>','Documents'],['<DIR>','Downloads'],['<DIR>','.ssh']],
+        'c:\\users\\administrator\\desktop':   [['1,337','flag.txt'],['2,048','notes.txt']],
+        'c:\\users\\administrator\\documents': [['4,096','passwords_old.txt'],['8,192','network_map.txt']],
+        'c:\\users\\administrator\\downloads': [],
+        'c:\\program files':          [['<DIR>','Common Files'],['<DIR>','Internet Explorer'],['<DIR>','Windows Defender'],['<DIR>','Microsoft SQL Server']],
+        'c:\\program files (x86)':    [['<DIR>','Common Files'],['<DIR>','Internet Explorer']],
+        'c:\\inetpub':                [['<DIR>','wwwroot'],['<DIR>','logs'],['<DIR>','temp']],
+        'c:\\inetpub\\wwwroot':        [['1,234','iisstart.htm'],['98,304','iisstart.png'],['<DIR>','aspnet_client']],
+        'c:\\corp_data':              [['<DIR>','Finance'],['<DIR>','HR'],['<DIR>','Customer'],['<DIR>','IT']],
+        'c:\\corp_data\\finance':      [['2,349,012','Q4_2023_Revenue_Final.xlsx'],['982,034','Annual_Budget_2024.xlsx'],['450,123','Payroll_Jan2024.xlsx']],
+        'c:\\corp_data\\hr':           [['12,492,048','All_Employees_PII.csv'],['823,440','Salary_Database_2024.xlsx']],
+        'c:\\corp_data\\customer':     [['89,234,502','Credit_Card_Database.csv'],['4,128,903','Loyalty_Members.csv']],
+        'c:\\corp_data\\it':           [['4,832','VPN_Credentials.txt'],['32,840','Network_Diagram.vsdx'],['128,934','Backup_Schedule.xlsx']],
+      };
+      const entries = dirMap[t];
+      if (entries === undefined) return { lines: [{ t: `File Not Found`, cls: 'r' }] };
+      const displayPath = arg || SIM.winCwd;
+      const out = [
+        { t: ` Volume in drive C has no label.  Volume Serial Number is 1337-D34D` },
         { t: '' },
-        { t: '*** SENSITIVE: PCI-DSS PROTECTED DATA — UNAUTHORIZED ACCESS IS A FEDERAL CRIME ***', cls: 'r' },
-      ]};
+        { t: ` Directory of ${displayPath}`, cls: 'b' },
+        { t: '' },
+        { t: `01/15/2024  02:23 PM    <DIR>          .` },
+        { t: `01/15/2024  02:23 PM    <DIR>          ..` },
+      ];
+      let fileCount = 0, fileBytes = 0, dirCount = 0;
+      for (const [size, name] of entries) {
+        if (size === '<DIR>') {
+          out.push({ t: `01/15/2024  02:23 PM    <DIR>          ${name}`, cls: 'b' });
+          dirCount++;
+        } else {
+          const cls = name.endsWith('.csv') ? 'r' : name.endsWith('.txt') ? 'y' : '';
+          out.push({ t: `01/15/2024  02:23 PM    ${size.padStart(14)}     ${name}`, cls });
+          fileCount++;
+          fileBytes += parseInt(size.replace(/,/g, '')) || 0;
+        }
+      }
+      out.push({ t: `               ${fileCount} File(s)    ${fileBytes.toLocaleString()} bytes` });
+      out.push({ t: `               ${dirCount} Dir(s)   32,456,789,120 bytes free` });
+      return { lines: out };
     }
-    if (/type.*VPN_Credentials/i.test(cmd)) return { lines: [
-      { t: '# VPN Gateway Credentials — CONFIDENTIAL' }, { t: '' },
-      { t: 'Gateway: vpn.corp.local:443', cls: 'b' },
-      { t: 'admin_vpn     : VPNAdmin2024!', cls: 'g' },
-      { t: 'backup_vpn    : Backup@Remote#99', cls: 'g' },
-      { t: 'emergency_vpn : Em3rg3ncy!2024', cls: 'g' },
-    ]};
-    if (/type.*All_Employees_PII/i.test(cmd)) return { lines: [
-      { t: 'EmployeeID,Name,SSN,DOB,Salary,Department', cls: 'b' },
-      { t: '1001,John Doe,123-45-6789,1985-03-15,$85000,IT', cls: 'g' },
-      { t: '1002,Jane Smith,234-56-7890,1979-07-22,$120000,Management', cls: 'g' },
-      { t: '1003,Robert Brown,345-67-8901,1990-11-08,$72000,Finance', cls: 'g' },
-      { t: '...', cls: 'd' },
-      { t: '[3,842 employee records — All_Employees_PII.csv  (12.4 MB)]', cls: 'y' },
-    ]};
-    // ── Generic dir / type fallbacks ────────────────────────────────────────
-    if (cmd.startsWith('dir')) return { lines: [
-      { t: ' Volume in drive C has no label.' },
-      { t: ' Directory of C:\\Windows\\system32' }, { t: '' },
-      { t: '01/15/2024  02:23 PM    <DIR>          .' },
-      { t: '01/15/2024  02:23 PM    <DIR>          ..' },
-      { t: '01/15/2024  02:23 PM    <DIR>          config' },
-      { t: '01/15/2024  02:23 PM        32,768     cmd.exe' },
-    ]};
-    if (cmd.startsWith('type')) return { lines: [
-      { t: `The system cannot find the file specified: ${cmd.replace(/^type\s+/,'')}`, cls: 'r' },
-    ]};
+
+    // ── type ─────────────────────────────────────────────────────────────────
+    if (/^type\s/i.test(cmd)) {
+      const f = cmd.replace(/^type\s+/i, '').trim().toLowerCase();
+      if (f.includes('credit_card_database')) {
+        SIM.lootExfiltrated = true;
+        return { id: 'loot-exfil', lines: [
+          { t: 'CustomerID,FirstName,LastName,Email,CardNumber,CVV,ExpDate,SSN', cls: 'b' },
+          { t: '10001,James,Wilson,j.wilson@email.com,4532-1234-5678-9012,341,03/27,123-45-6789', cls: 'g' },
+          { t: '10002,Sarah,Chen,s.chen@email.com,5412-7534-1234-5678,229,08/25,234-56-7890', cls: 'g' },
+          { t: '10003,Robert,Martinez,r.martinez@email.com,4916-8765-4321-0987,512,12/26,345-67-8901', cls: 'g' },
+          { t: '10004,Emily,Johnson,e.johnson@email.com,3782-822463-10005,091,06/28,456-78-9012', cls: 'g' },
+          { t: '10005,David,Kim,d.kim@email.com,6011-9876-5432-1098,774,11/25,567-89-0123', cls: 'g' },
+          { t: '...', cls: 'd' },
+          { t: '[23,452 records total — Credit_Card_Database.csv  (89.2 MB)]', cls: 'y' },
+          { t: '' },
+          { t: '*** SENSITIVE: PCI-DSS PROTECTED DATA — UNAUTHORIZED ACCESS IS A FEDERAL CRIME ***', cls: 'r' },
+        ]};
+      }
+      if (f.includes('vpn_credentials')) return { lines: [
+        { t: '# VPN Gateway Credentials — CONFIDENTIAL' }, { t: '' },
+        { t: 'Gateway: vpn.corp.local:443', cls: 'b' },
+        { t: 'admin_vpn     : VPNAdmin2024!', cls: 'g' },
+        { t: 'backup_vpn    : Backup@Remote#99', cls: 'g' },
+        { t: 'emergency_vpn : Em3rg3ncy!2024', cls: 'g' },
+      ]};
+      if (f.includes('all_employees_pii')) return { lines: [
+        { t: 'EmployeeID,Name,SSN,DOB,Salary,Department', cls: 'b' },
+        { t: '1001,John Doe,123-45-6789,1985-03-15,$85000,IT', cls: 'g' },
+        { t: '1002,Jane Smith,234-56-7890,1979-07-22,$120000,Management', cls: 'g' },
+        { t: '1003,Robert Brown,345-67-8901,1990-11-08,$72000,Finance', cls: 'g' },
+        { t: '...', cls: 'd' },
+        { t: '[3,842 employee records — All_Employees_PII.csv  (12.4 MB)]', cls: 'y' },
+      ]};
+      if (f.includes('flag.txt')) return { lines: [{ t: 'FLAG{dc01_compromised_nt_authority_system}', cls: 'g' }] };
+      if (f.includes('passwords_old')) return { lines: [
+        { t: '# Old passwords — archived 2022' },
+        { t: 'Administrator: P@ssw0rd2022!', cls: 'y' },
+        { t: 'svc_backup: Backup2021!', cls: 'y' },
+      ]};
+      return { lines: [{ t: `The system cannot find the file specified.`, cls: 'r' }] };
+    }
+
     if (cmd === 'cls') return { clear: true };
+    if (cmd === 'echo %cd%' || cmd === 'cd') return { lines: [{ t: SIM.winCwd }] };
     return { lines: [{ t: `'${cmd.split(' ')[0]}' is not recognized as an internal or external command.`, cls: 'r' }] };
   }
 
@@ -2503,6 +2561,7 @@ function runCommand(rawInput) {
     SIM.cwd = '/home/kali';
     SIM.user = 'kali';
     SIM.windowsShell = false;
+    SIM.winCwd = 'C:\\Windows\\system32';
     SIM.hashesOnDisk = false;
     SIM.lootExfiltrated = false;
     if (typeof CTF !== 'undefined') CTF._reset?.();

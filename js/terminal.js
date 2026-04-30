@@ -124,7 +124,7 @@ function createTerminal() {
     // ── Prompt ──────────────────────────────────────────────────────────────
     _writePrompt() {
       if (SIM.windowsShell) {
-        this._xterm.write('\x1b[33mC:\\Windows\\system32>\x1b[0m ');
+        this._xterm.write('\x1b[33m' + SIM.winCwd + '>\x1b[0m ');
         return;
       }
       const user  = SIM.user;
