@@ -70,7 +70,9 @@ function createTerminal() {
       this._xterm.onData(d => this._onData(d));
 
       // Block browser from stealing Ctrl+W / Ctrl+S when nano is active
+      // Also block Tab from moving browser focus away from terminal
       this._xterm.textarea?.addEventListener('keydown', e => {
+        if (e.key === 'Tab') { e.preventDefault(); return; }
         if (this._nano && (e.ctrlKey || e.metaKey)) {
           const blocked = ['w','s','r','f','g','k','u','x','o','\\'];
           if (blocked.includes(e.key.toLowerCase())) e.preventDefault();
@@ -110,11 +112,7 @@ function createTerminal() {
       }
     },
 
-    _printWelcome() {
-      this._printLines([
-        { t: '' },
-      ]);
-    },
+    _printWelcome() {},
 
     // ── Prompt ──────────────────────────────────────────────────────────────
     _writePrompt() {
@@ -123,7 +121,7 @@ function createTerminal() {
         return;
       }
       const user  = SIM.user;
-      const home  = user === 'root' ? '/root' : '/home/capy';
+      const home  = user === 'root' ? '/root' : '/home/' + user;
       const cwd   = SIM.cwd === home ? '~' : SIM.cwd;
       const sigil = user === 'root' ? '#' : '$';
       this._xterm.writeln(
@@ -350,7 +348,10 @@ function createTerminal() {
       if (n.prompt === 'save') {
         t.write('\x1b[7m' + `File Name to Write: ${n.promptBuf}`.padEnd(cols).slice(0, cols) + '\x1b[0m');
       } else if (n.prompt === 'search') {
-        t.write('\x1b[7m' + `Search: ${n.promptBuf}`.padEnd(cols).slice(0, cols) + '\x1b[0m');
+        const label = n._replacing ? 'Search (to replace): ' : 'Search: ';
+        t.write('\x1b[7m' + (label + n.promptBuf).padEnd(cols).slice(0, cols) + '\x1b[0m');
+      } else if (n.prompt === 'replace') {
+        t.write('\x1b[7m' + `Replace with: ${n.promptBuf}`.padEnd(cols).slice(0, cols) + '\x1b[0m');
       } else if (n.prompt === 'exit') {
         t.write('\x1b[7m' + 'Save modified buffer? (Answering "No" will DISCARD changes.)  Y/N/?'.padEnd(cols).slice(0, cols) + '\x1b[0m');
       } else if (n._statusMsg) {
@@ -382,20 +383,16 @@ function createTerminal() {
 
     _nanoInput(data) {
       const n = this._nano;
-      const cols = this._nanoCols();
       const rows = this._nanoRows();
 
-      // ── Prompt mode (save / search / exit confirm) ───────────────────────
+      // ── Prompt modes ────────────────────────────────────────────────────
       if (n.prompt === 'exit') {
         if (data === 'y' || data === 'Y') {
-          n.prompt = 'save';
-          n.promptBuf = n.filename || '';
-          this._nanoRender();
+          n.prompt = 'save'; n.promptBuf = n.filename || ''; this._nanoRender();
         } else if (data === 'n' || data === 'N') {
           this._nanoClose();
-        } else if (data === '\x07' || data === '\x03') { // ^G or ^C cancel
-          n.prompt = null;
-          this._nanoRender();
+        } else if (data === '\x07' || data === '\x03') {
+          n.prompt = null; this._nanoRender();
         }
         return;
       }
@@ -411,10 +408,8 @@ function createTerminal() {
             n.dirty = false;
             n._statusMsg = `Wrote ${n.lines.length} lines`;
           }
-          n.prompt = null;
-          n.promptBuf = '';
+          n.prompt = null; n.promptBuf = '';
           this._nanoRender();
-          // if we were exiting, close now
           if (n._exitAfterSave) this._nanoClose();
           return;
         }
@@ -426,10 +421,14 @@ function createTerminal() {
 
       if (n.prompt === 'search') {
         if (data === '\r') {
-          n.searchStr = n.promptBuf;
-          n.prompt = null;
-          n.promptBuf = '';
-          this._nanoDoSearch();
+          if (n.promptBuf) n.searchStr = n.promptBuf;
+          if (n._replacing) {
+            n.prompt = 'replace'; n.promptBuf = n.replaceStr || '';
+            this._nanoRender();
+          } else {
+            n.prompt = null; n.promptBuf = '';
+            this._nanoDoSearch(false);
+          }
           return;
         }
         if (data === '\x07' || data === '\x03') { n.prompt = null; n.promptBuf = ''; this._nanoRender(); return; }
@@ -438,35 +437,46 @@ function createTerminal() {
         return;
       }
 
-      // ── Normal editing mode ──────────────────────────────────────────────
-
-      // Ctrl+X — exit (prompt if dirty)
-      if (data === '\x18') {
-        if (n.dirty) {
-          n.prompt = 'exit';
-          n._exitAfterSave = true;
-          this._nanoRender();
-        } else {
-          this._nanoClose();
+      if (n.prompt === 'replace') {
+        if (data === '\r') {
+          n.replaceStr = n.promptBuf;
+          n.prompt = null; n.promptBuf = '';
+          this._nanoDoReplace();
+          return;
         }
+        if (data === '\x07' || data === '\x03') { n.prompt = null; n.promptBuf = ''; n._replacing = false; this._nanoRender(); return; }
+        if (data === '\x7f') { n.promptBuf = n.promptBuf.slice(0, -1); this._nanoRender(); return; }
+        if (data.length === 1 && data >= ' ') { n.promptBuf += data; this._nanoRender(); return; }
+        return;
+      }
+
+      // ── Normal editing ───────────────────────────────────────────────────
+
+      // Ctrl+X — exit
+      if (data === '\x18') {
+        if (n.dirty) { n.prompt = 'exit'; n._exitAfterSave = true; this._nanoRender(); }
+        else this._nanoClose();
         return;
       }
 
       // Ctrl+O — write out
       if (data === '\x0f') {
-        n.prompt = 'save';
-        n.promptBuf = n.filename || '';
-        n._exitAfterSave = false;
-        this._nanoRender();
-        return;
+        n.prompt = 'save'; n.promptBuf = n.filename || ''; n._exitAfterSave = false;
+        this._nanoRender(); return;
       }
 
       // Ctrl+W — search
       if (data === '\x17') {
-        n.prompt = 'search';
-        n.promptBuf = n.searchStr || '';
-        this._nanoRender();
-        return;
+        n._replacing = false;
+        n.prompt = 'search'; n.promptBuf = n.searchStr || '';
+        this._nanoRender(); return;
+      }
+
+      // Ctrl+\ — replace
+      if (data === '\x1c') {
+        n._replacing = true;
+        n.prompt = 'search'; n.promptBuf = n.searchStr || '';
+        this._nanoRender(); return;
       }
 
       // Ctrl+K — cut line
@@ -475,92 +485,54 @@ function createTerminal() {
         if (n.lines.length === 0) n.lines = [''];
         n.cy = Math.min(n.cy, n.lines.length - 1);
         n.cx = Math.min(n.cx, n.lines[n.cy].length);
-        n.dirty = true;
-        this._nanoScrollIntoView();
-        this._nanoRender();
-        return;
+        n._prefCx = n.cx; n.dirty = true;
+        this._nanoScrollIntoView(); this._nanoRender(); return;
       }
 
       // Ctrl+U — paste
       if (data === '\x15') {
         if (n.cutBuf.length > 0) {
           n.lines.splice(n.cy, 0, ...n.cutBuf);
-          n.cy += n.cutBuf.length;
-          n.cx = 0;
-          n.dirty = true;
-          this._nanoScrollIntoView();
-          this._nanoRender();
+          n.cy += n.cutBuf.length; n.cx = 0; n._prefCx = 0; n.dirty = true;
+          this._nanoScrollIntoView(); this._nanoRender();
         }
         return;
       }
 
-      // Ctrl+C — show cursor position
+      // Ctrl+C — cursor position
       if (data === '\x03') {
         n._statusMsg = `line ${n.cy + 1}/${n.lines.length} col ${n.cx + 1}`;
-        this._nanoRender();
-        return;
+        this._nanoRender(); return;
       }
 
-      // Ctrl+G — help (mini)
+      // Ctrl+G — help
       if (data === '\x07') {
-        n._statusMsg = 'Ctrl+X Exit  Ctrl+O Save  Ctrl+W Search  Ctrl+K Cut  Ctrl+U Paste';
-        this._nanoRender();
-        return;
-      }
-
-      // Ctrl+\ — replace (simple: search then replace)
-      if (data === '\x1c') {
-        n.prompt = 'search';
-        n.promptBuf = '';
-        n._replacing = true;
-        this._nanoRender();
-        return;
+        n._statusMsg = '^X Exit  ^O Save  ^W Search  ^\\Replace  ^K Cut  ^U Paste  ^C Pos';
+        this._nanoRender(); return;
       }
 
       // Arrow keys
-      if (data === '\x1b[A') { // up
-        if (n.cy > 0) {
-          n.cy--;
-          n._prefCx = Math.max(n._prefCx, n.cx);
-          n.cx = Math.min(n._prefCx, n.lines[n.cy].length);
-        }
+      if (data === '\x1b[A') {
+        if (n.cy > 0) { n.cy--; n._prefCx = Math.max(n._prefCx, n.cx); n.cx = Math.min(n._prefCx, n.lines[n.cy].length); }
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
-      if (data === '\x1b[B') { // down
-        if (n.cy < n.lines.length - 1) {
-          n.cy++;
-          n._prefCx = Math.max(n._prefCx, n.cx);
-          n.cx = Math.min(n._prefCx, n.lines[n.cy].length);
-        }
+      if (data === '\x1b[B') {
+        if (n.cy < n.lines.length - 1) { n.cy++; n._prefCx = Math.max(n._prefCx, n.cx); n.cx = Math.min(n._prefCx, n.lines[n.cy].length); }
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
-      if (data === '\x1b[C') { // right
-        if (n.cx < n.lines[n.cy].length) {
-          n.cx++;
-        } else if (n.cy < n.lines.length - 1) {
-          n.cy++; n.cx = 0;
-        }
-        n._prefCx = n.cx;
-        this._nanoScrollIntoView(); this._nanoRender(); return;
+      if (data === '\x1b[C') {
+        if (n.cx < n.lines[n.cy].length) { n.cx++; } else if (n.cy < n.lines.length - 1) { n.cy++; n.cx = 0; }
+        n._prefCx = n.cx; this._nanoScrollIntoView(); this._nanoRender(); return;
       }
-      if (data === '\x1b[D') { // left
-        if (n.cx > 0) {
-          n.cx--;
-        } else if (n.cy > 0) {
-          n.cy--; n.cx = n.lines[n.cy].length;
-        }
-        n._prefCx = n.cx;
-        this._nanoScrollIntoView(); this._nanoRender(); return;
+      if (data === '\x1b[D') {
+        if (n.cx > 0) { n.cx--; } else if (n.cy > 0) { n.cy--; n.cx = n.lines[n.cy].length; }
+        n._prefCx = n.cx; this._nanoScrollIntoView(); this._nanoRender(); return;
       }
 
       // Home / Ctrl+A
-      if (data === '\x1b[H' || data === '\x01') {
-        n.cx = 0; n._prefCx = 0; this._nanoRender(); return;
-      }
+      if (data === '\x1b[H' || data === '\x01') { n.cx = 0; n._prefCx = 0; this._nanoRender(); return; }
       // End / Ctrl+E
-      if (data === '\x1b[F' || data === '\x05') {
-        n.cx = n.lines[n.cy].length; n._prefCx = n.cx; this._nanoRender(); return;
-      }
+      if (data === '\x1b[F' || data === '\x05') { n.cx = n.lines[n.cy].length; n._prefCx = n.cx; this._nanoRender(); return; }
 
       // PgUp / Ctrl+Y
       if (data === '\x1b[5~' || data === '\x19') {
@@ -575,25 +547,17 @@ function createTerminal() {
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
 
-      // Ctrl+Home / go to first line
-      if (data === '\x1b[1;5H' || data === '\x1b[H' && false) {
-        n.cy = 0; n.cx = 0; this._nanoScrollIntoView(); this._nanoRender(); return;
-      }
-      // Ctrl+End / go to last line
-      if (data === '\x1b[1;5F') {
-        n.cy = n.lines.length - 1; n.cx = n.lines[n.cy].length;
-        this._nanoScrollIntoView(); this._nanoRender(); return;
-      }
+      // Ctrl+Home
+      if (data === '\x1b[1;5H') { n.cy = 0; n.cx = 0; n._prefCx = 0; this._nanoScrollIntoView(); this._nanoRender(); return; }
+      // Ctrl+End
+      if (data === '\x1b[1;5F') { n.cy = n.lines.length - 1; n.cx = n.lines[n.cy].length; n._prefCx = n.cx; this._nanoScrollIntoView(); this._nanoRender(); return; }
 
       // Enter
       if (data === '\r') {
         const line = n.lines[n.cy];
-        const before = line.slice(0, n.cx);
-        const after  = line.slice(n.cx);
-        n.lines[n.cy] = before;
-        n.lines.splice(n.cy + 1, 0, after);
-        n.cy++; n.cx = 0; n._prefCx = 0;
-        n.dirty = true;
+        n.lines[n.cy] = line.slice(0, n.cx);
+        n.lines.splice(n.cy + 1, 0, line.slice(n.cx));
+        n.cy++; n.cx = 0; n._prefCx = 0; n.dirty = true;
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
 
@@ -609,12 +573,11 @@ function createTerminal() {
           n.lines.splice(n.cy, 1);
           n.cy--;
         }
-        n._prefCx = n.cx;
-        n.dirty = true;
+        n._prefCx = n.cx; n.dirty = true;
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
 
-      // Delete key
+      // Delete
       if (data === '\x1b[3~') {
         const line = n.lines[n.cy];
         if (n.cx < line.length) {
@@ -623,27 +586,22 @@ function createTerminal() {
           n.lines[n.cy] = line + n.lines[n.cy + 1];
           n.lines.splice(n.cy + 1, 1);
         }
-        n._prefCx = n.cx;
-        n.dirty = true;
-        this._nanoRender(); return;
+        n._prefCx = n.cx; n.dirty = true; this._nanoRender(); return;
       }
 
       // Tab
       if (data === '\t') {
-        const spaces = '  ';
-        n.lines[n.cy] = n.lines[n.cy].slice(0, n.cx) + spaces + n.lines[n.cy].slice(n.cx);
-        n.cx += spaces.length; n._prefCx = n.cx;
-        n.dirty = true;
-        this._nanoRender(); return;
+        const sp = '  ';
+        n.lines[n.cy] = n.lines[n.cy].slice(0, n.cx) + sp + n.lines[n.cy].slice(n.cx);
+        n.cx += sp.length; n._prefCx = n.cx; n.dirty = true; this._nanoRender(); return;
       }
 
-      // Printable chars (including paste)
+      // Printable / paste
       if (data.length >= 1 && (data.length > 1 || data >= ' ')) {
         const printable = data.replace(/[\x00-\x1f\x7f]/g, '');
         if (!printable) return;
         n.lines[n.cy] = n.lines[n.cy].slice(0, n.cx) + printable + n.lines[n.cy].slice(n.cx);
-        n.cx += printable.length; n._prefCx = n.cx;
-        n.dirty = true;
+        n.cx += printable.length; n._prefCx = n.cx; n.dirty = true;
         this._nanoRender();
       }
     },
@@ -655,24 +613,47 @@ function createTerminal() {
       if (n.cy >= n.scrollY + rows) n.scrollY = n.cy - rows + 1;
     },
 
-    _nanoDoSearch() {
+    _nanoDoSearch(fromCurrent) {
       const n = this._nano;
       if (!n.searchStr) { this._nanoRender(); return; }
       const str = n.searchStr.toLowerCase();
-      // Search from current position forward, wrap around
-      for (let i = 0; i < n.lines.length; i++) {
-        const lineIdx = (n.cy + i + 1) % n.lines.length;
-        const col = n.lines[lineIdx].toLowerCase().indexOf(str, lineIdx === n.cy ? n.cx + 1 : 0);
+      const totalLines = n.lines.length;
+      // Search forward from cursor, wrap around
+      for (let i = 0; i < totalLines; i++) {
+        const lineIdx = (n.cy + i) % totalLines;
+        const startCol = (i === 0 && !fromCurrent) ? n.cx + 1 : (i === 0 ? n.cx : 0);
+        const col = n.lines[lineIdx].toLowerCase().indexOf(str, startCol);
         if (col !== -1) {
-          n.cy = lineIdx; n.cx = col;
+          n.cy = lineIdx; n.cx = col; n._prefCx = col;
           n._statusMsg = `Found "${n.searchStr}"`;
-          this._nanoScrollIntoView();
-          this._nanoRender();
-          return;
+          this._nanoScrollIntoView(); this._nanoRender(); return;
         }
       }
       n._statusMsg = `"${n.searchStr}" not found`;
       this._nanoRender();
+    },
+
+    _nanoDoReplace() {
+      const n = this._nano;
+      if (!n.searchStr) { this._nanoRender(); return; }
+      const search = n.searchStr;
+      const replace = n.replaceStr || '';
+      let count = 0;
+      for (let i = 0; i < n.lines.length; i++) {
+        const orig = n.lines[i];
+        const updated = orig.split(search).join(replace);
+        if (updated !== orig) { n.lines[i] = updated; count += orig.split(search).length - 1; }
+      }
+      if (count > 0) {
+        n.dirty = true;
+        n._statusMsg = `Replaced ${count} occurrence${count !== 1 ? 's' : ''}`;
+        // reposition cursor to first match or clamp
+        n.cx = Math.min(n.cx, n.lines[n.cy].length);
+      } else {
+        n._statusMsg = `"${search}" not found`;
+      }
+      n._replacing = false;
+      this._nanoScrollIntoView(); this._nanoRender();
     },
 
     _nanoClose() {

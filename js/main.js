@@ -42,22 +42,51 @@
       if (!user) { showError('Username required'); return; }
       localStorage.setItem('hacklet_user', user);
       localStorage.setItem('hacklet_pass', simpleHash(pass));
-      SIM.user = user;
-      SIM.cwd  = '/home/' + user;
-      SIM.files['/home/' + user + '/notes.txt'] = SIM.files['/home/capy/notes.txt'] || '';
+      _applyUser(user);
     } else {
       if (simpleHash(pass) !== storedHash) { showError('Incorrect password'); authPassEl.value = ''; return; }
-      SIM.user = storedUser;
-      SIM.cwd  = '/home/' + storedUser;
+      _applyUser(storedUser);
     }
 
     authScreen.style.opacity = '0';
     authScreen.style.transition = 'opacity 0.3s';
     setTimeout(() => {
       authScreen.style.display = 'none';
-      desktopEl.style.display = '';
+      desktopEl.style.display = 'block';
       initDesktop();
     }, 300);
+  }
+
+  function _applyUser(user) {
+    SIM.user = user;
+    SIM.cwd  = '/home/' + user;
+    const h = '/home/' + user;
+    // Copy default home files from /home/capy to the real user's home
+    const defaults = ['/home/capy/notes.txt', '/home/capy/.bash_history'];
+    for (const src of defaults) {
+      const dest = src.replace('/home/capy/', h + '/');
+      if (!SIM.files[dest]) SIM.files[dest] = SIM.files[src] || '';
+    }
+    // Populate home subdirectory files
+    SIM.files[h + '/Desktop/README.txt']                    = `Welcome to CapyOS 2024.2\nThis is your Desktop folder.`;
+    SIM.files[h + '/Documents/credentials.txt']             = `# Credentials found during engagement\n# DO NOT SHARE\njohn.doe : Password1!\nsvc_backup : Backup2023!`;
+    SIM.files[h + '/Documents/network_notes.md']            = `# Network Notes\n## Targets\n- 10.10.10.10 - DC01.CORP.LOCAL (Domain Controller)\n- 10.10.10.5  - Kali attack box\n\n## Open Ports (DC01)\n- 88  Kerberos\n- 389 LDAP\n- 445 SMB\n- 3268 Global Catalog`;
+    SIM.files[h + '/Documents/reports/pentest_report_draft.md'] = `# Penetration Test Report - DRAFT\n## Executive Summary\nA full domain compromise was achieved via Kerberoasting.\n## Findings\n1. Weak service account passwords\n2. No account lockout on service accounts\n3. RC4 encryption allowed on Kerberos tickets`;
+    SIM.files[h + '/Documents/reports/scope.txt']            = `# Engagement Scope\nClient: CORP.LOCAL\nIP Range: 10.10.10.0/24\nDomain Controller: 10.10.10.10\nStart: 2024-01-15\nEnd: 2024-01-22`;
+    SIM.files[h + '/Documents/tools/nmap_cheatsheet.txt']    = `# Nmap Cheatsheet\nnmap -sn 10.10.10.0/24          # ping sweep\nnmap -sV -sC -p- 10.10.10.10    # full scan\nnmap -sU --top-ports 100 <ip>   # UDP scan\nnmap --script vuln <ip>         # vuln scan`;
+    SIM.files[h + '/Documents/tools/ad_attack_notes.txt']    = `# Active Directory Attack Notes\n## Kerberoasting\n1. GetUserSPNs -> request TGS tickets\n2. Crack offline with john/hashcat\n\n## Pass-the-Hash\n- Use NT hash directly with CME -H flag\n\n## DCSync\n- Requires Replication rights or Domain Admin`;
+    SIM.files[h + '/Downloads/linpeas.sh']                   = `#!/bin/bash\n# linpeas.sh - Linux Privilege Escalation Awesome Script\necho "[+] Starting LinPEAS..."\necho "[+] System info:" && uname -a`;
+    SIM.files[h + '/.ssh/known_hosts']                       = `10.10.10.10 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC...\n10.10.10.1 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY...`;
+    SIM.files[h + '/.bashrc']                                = `# ~/.bashrc: executed by bash for non-login shells\nexport PATH="$HOME/.local/bin:$PATH"\nalias ll='ls -alF'\nalias la='ls -A'\nalias l='ls -CF'\nalias grep='grep --color=auto'\nalias ls='ls --color=auto'\nPS1='\\u@\\h:\\w\\$ '`;
+    SIM.files[h + '/.bash_logout']                           = `# ~/.bash_logout: executed by bash when login shell exits\nclear`;
+    SIM.files[h + '/.profile']                               = `# ~/.profile: executed by the command interpreter for login shells\nif [ -n "$BASH_VERSION" ]; then\n  if [ -f "$HOME/.bashrc" ]; then\n    . "$HOME/.bashrc"\n  fi\nfi\nif [ -d "$HOME/bin" ] ; then\n  PATH="$HOME/bin:$PATH"\nfi`;
+    SIM.files[h + '/.zshrc']                                 = `# ~/.zshrc\nexport ZSH="$HOME/.oh-my-zsh"\nZSH_THEME="robbyrussell"\nplugins=(git)\nalias ll='ls -alF'\nalias grep='grep --color=auto'`;
+    SIM.files[h + '/.msf4/history']                          = `use exploit/windows/smb/ms17_010_eternalblue\nset RHOSTS 10.10.10.10\nrun`;
+    // Update /etc/passwd and /etc/group with real username
+    SIM.files['/etc/passwd'] = `root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n${user}:x:1000:1000:${user},,,:/home/${user}:/bin/bash`;
+    SIM.files['/etc/group']  = `root:x:0:\ndaemon:x:1:\nsudo:x:27:${user}\nadm:x:4:${user}\ncdrom:x:24:${user}\ndip:x:30:${user}\npluggdev:x:46:${user}\nnetdev:x:109:${user}\n${user}:x:1000:`;
+    SIM.files['/etc/shadow'] = `root:!:19736:0:99999:7:::\ndaemon:*:19736:0:99999:7:::\n${user}:$6$rounds=656000$randomsalt$hashedpassword:19736:0:99999:7:::`;
+    SIM.files['/etc/hostname'] = user === 'capy' ? 'capy' : user;
   }
 
   authSubmit.addEventListener('click', doAuth);
@@ -150,7 +179,7 @@
     _termCount++;
     const label = _termCount === 1 ? '>_ Terminal' : `>_ Terminal ${_termCount}`;
 
-    const win = createWindow('Terminal — capy@kali', 720, 460, `
+    const win = createWindow('Terminal — ' + SIM.user + '@capy', 720, 460, `
       <div class="term-tabs-bar"></div>
       <div class="term-panes"></div>
     `);
@@ -242,7 +271,7 @@
 
   // ── Virtual filesystem for file manager ───────────────────────────────────
   function fmGetDir(path) {
-    const kh = '/home/capy';
+    const kh = '/home/' + SIM.user;
     const hashes = SIM.hashesOnDisk ? [{ name: 'hashes.kerberoast', type: 'file' }] : [];
     const map = {
       '/': [
@@ -253,7 +282,7 @@
         { name: 'usr',  type: 'dir' },
         { name: 'var',  type: 'dir' },
       ],
-      '/home': [{ name: 'kali', type: 'dir' }],
+      '/home': [{ name: SIM.user, type: 'dir' }],
       [kh]: [
         { name: 'Desktop',   type: 'dir' },
         { name: 'Documents', type: 'dir' },
@@ -304,7 +333,7 @@
 
   // ── File manager window ───────────────────────────────────────────────────
   function openFileManagerWindow() {
-    const startPath = SIM.user === 'root' ? '/root' : '/home/capy';
+    const startPath = SIM.user === 'root' ? '/root' : '/home/' + SIM.user;
 
     const win = createWindow('Files', 800, 520, `
       <div class="fm-window">
@@ -318,7 +347,7 @@
         <div class="fm-body">
           <nav class="fm-sidebar">
             <div class="fm-sidebar-label">Places</div>
-            <div class="fm-sidebar-item" data-path="/home/capy"><i class="fa fa-house"></i> Home</div>
+            <div class="fm-sidebar-item" data-path="/home/" + SIM.user><i class="fa fa-house"></i> Home</div>
             <div class="fm-sidebar-item" data-path="/home/capy/Desktop"><i class="fa fa-display"></i> Desktop</div>
             <div class="fm-sidebar-item" data-path="/home/capy/Documents"><i class="fa fa-folder"></i> Documents</div>
             <div class="fm-sidebar-item" data-path="/home/capy/Downloads"><i class="fa fa-arrow-down"></i> Downloads</div>
@@ -484,7 +513,7 @@
       const parent = p.lastIndexOf('/') > 0 ? p.slice(0, p.lastIndexOf('/')) : '/';
       navigate(parent);
     });
-    homeBtn.addEventListener('click', () => navigate('/home/capy'));
+    homeBtn.addEventListener('click', () => navigate('/home/' + SIM.user));
     sidebar.querySelectorAll('.fm-sidebar-item').forEach(el => {
       el.addEventListener('click', () => navigate(el.dataset.path));
     });
