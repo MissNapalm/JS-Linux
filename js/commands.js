@@ -9,6 +9,15 @@ const SIM = {
   hashesOnDisk: false,
   lootExfiltrated: false,
   dirs: new Set(),
+  // ── Metasploit state ──────────────────────────────────────────────────────
+  msf: false,           // in msfconsole
+  msfModule: null,      // active module path
+  msfOpts: {},          // set options per module: { [module]: { OPT: val } }
+  msfSessions: [],      // active sessions
+  msfMeter: false,      // in meterpreter
+  msfMeterId: null,     // active session id
+  msfMeterWin: false,   // in windows shell from meterpreter
+  legacyPwned: false,   // EternalBlue succeeded
   files: {
     '/home/capy/notes.txt': `# Notes - DO NOT SHARE
 # Found on workstation WS01 during initial recon
@@ -207,12 +216,7 @@ const HANDLERS = [
   },
   {
     match: c => c === 'history',
-    lines: [
-      { t: '    1  sudo nmap -sn 10.10.10.0/24' },
-      { t: '    2  sudo nmap -sV -sC 10.10.10.10' },
-      { t: '    3  enum4linux -a 10.10.10.10' },
-      { t: () => '    4  cat /home/' + SIM.user + '/notes.txt' },
-    ],
+    lines: [{ t: () => ({ history: true }) }],
   },
 
   // ── ls ────────────────────────────────────────────────────────────────────
@@ -291,7 +295,8 @@ const HANDLERS = [
       } else if (cwd === '/etc/pam.d') {
         dirs = new Set([]); files = ['common-auth','common-account','common-password','common-session','login','sshd','sudo','su'];
       } else if (cwd === '/home') {
-        dirs  = new Set([SIM.user]);
+        const registeredUser = localStorage.getItem('hacklet_user') || SIM.user;
+        dirs  = new Set([registeredUser]);
         files = [];
       } else if (cwd === '/tmp') {
         dirs  = new Set(['systemd-private-abc123','snap-private-tmp']);
@@ -552,10 +557,57 @@ id: 'nmap-discovery',
       { t: 'Nmap scan report for 10.10.10.5', cls: 'b' },
       { t: 'Host is up (0.000082s latency).' },
       { t: '' },
+      { t: 'Nmap scan report for LEGACY (10.10.10.50)', cls: 'b' },
+      { t: 'Host is up (0.0021s latency).' },
+      { t: '' },
       { t: 'Nmap scan report for DC01.CORP.LOCAL (10.10.10.10)', cls: 'b' },
       { t: 'Host is up (0.0015s latency).' },
       { t: '' },
-      { t: 'Nmap done: 256 IP addresses (3 hosts up) scanned in 2.41 seconds', cls: 'g' },
+      { t: 'Nmap done: 256 IP addresses (4 hosts up) scanned in 2.41 seconds', cls: 'g' },
+    ],
+  },
+    // ── nmap LEGACY (10.10.10.50) ───────────────────────────────────────────────────────────────────────────
+  {
+    id: 'nmap-legacy',
+    loadTime: () => jitter(18000, 3000),
+    progressFn: (elapsed, total) => {
+      const pct = Math.min(99.99, elapsed / total * 100).toFixed(2);
+      const remMs = Math.max(0, total - elapsed);
+      const remSec = Math.floor(remMs / 1000);
+      return [
+        { t: `Stats: 0:${String(Math.floor(elapsed/1000)).padStart(2,'0')} elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan`, cls: 'd' },
+        { t: `SYN Stealth Scan Timing: About ${pct}% done; ETC: --:-- (0:${String(remSec).padStart(2,'0')} remaining)`, cls: 'd' },
+      ];
+    },
+    match: c => /^nmap\b/.test(c) && c.includes('10.10.10.50'),
+    lines: [
+      { t: () => 'Starting Nmap 7.94 ( https://nmap.org ) at ' + new Date().toUTCString().slice(0,16) },
+      { t: 'Nmap scan report for LEGACY (10.10.10.50)' },
+      { t: 'Host is up (0.0021s latency).' },
+      { t: 'Not shown: 65532 closed tcp ports (reset)' },
+      { t: 'PORT      STATE SERVICE      VERSION' },
+      { t: '135/tcp   open  msrpc        Microsoft Windows RPC', cls: 'g' },
+      { t: '139/tcp   open  netbios-ssn  Microsoft Windows netbios-ssn', cls: 'g' },
+      { t: '445/tcp   open  microsoft-ds Windows 7 Professional 7601 Service Pack 1 microsoft-ds (workgroup: WORKGROUP)', cls: 'r' },
+      { t: '' },
+      { t: 'Host script results:' },
+      { t: '|_clock-skew: mean: 1h20m00s, deviation: 2h18m34s, median: 0s' },
+      { t: '| smb-os-discovery:' },
+      { t: '|   OS: Windows 7 Professional 7601 Service Pack 1 (Windows 7 Professional 6.1)', cls: 'r' },
+      { t: '|   OS CPE: cpe:/o:microsoft:windows_7::sp1:professional' },
+      { t: '|   Computer name: LEGACY' },
+      { t: '|   NetBIOS computer name: LEGACY\\x00' },
+      { t: '|   Workgroup: WORKGROUP\\x00' },
+      { t: '| smb-security-mode:' },
+      { t: '|   account_used: guest' },
+      { t: '|   authentication_level: user' },
+      { t: '|   challenge_response: supported' },
+      { t: '|_  message_signing: disabled (dangerous, but default)', cls: 'r' },
+      { t: '|_smb2-time: Protocol negotiation failed (SMB2)' },
+      { t: '' },
+      { t: 'Service Info: Host: LEGACY; OS: Windows; CPE: cpe:/o:microsoft:windows' },
+      { t: '' },
+      { t: () => 'Nmap done: 1 IP address (1 host up) scanned in ' + (17.2 + Math.random()).toFixed(2) + ' seconds', cls: 'g' },
     ],
   },
   {
@@ -2475,6 +2527,260 @@ id: 'nmap-discovery',
 
   // ── Windows shell extras ──────────────────────────────────────────────────
 
+  // ── EternalBlue nmap discovery ────────────────────────────────────────────
+  {
+    id: 'nmap-eb-discovery',
+    loadTime: () => jitter(2800, 500),
+    match: c => /^nmap\b/.test(c) && (c.includes('10.10.20') || c.includes('20.0/24')),
+    lines: [
+      { t: 'Starting Nmap 7.94 ( https://nmap.org )' },
+      { t: '' },
+      { t: 'Nmap scan report for 10.10.20.1', cls: 'b' },
+      { t: 'Host is up (0.00042s latency).' },
+      { t: '' },
+      { t: 'Nmap scan report for 10.10.20.5', cls: 'b' },
+      { t: 'Host is up (0.000071s latency).' },
+      { t: '' },
+      { t: 'Nmap scan report for WIN7-PC (10.10.20.10)', cls: 'g' },
+      { t: 'Host is up (0.0021s latency).' },
+      { t: '' },
+      { t: 'Nmap done: 256 IP addresses (3 hosts up) scanned in 2.61 seconds', cls: 'g' },
+    ],
+  },
+
+  // ── EternalBlue vuln scan ─────────────────────────────────────────────────
+  {
+    id: 'nmap-eb-vuln',
+    loadTime: () => jitter(8000, 1500),
+    match: c => /^nmap\b/.test(c) && c.includes('smb-vuln') && c.includes('10.10.20.10'),
+    lines: [
+      { t: 'Starting Nmap 7.94 ( https://nmap.org )' },
+      { t: 'Nmap scan report for WIN7-PC (10.10.20.10)' },
+      { t: 'Host is up (0.0021s latency).' },
+      { t: '' },
+      { t: 'PORT    STATE SERVICE' },
+      { t: '445/tcp open  microsoft-ds', cls: 'g' },
+      { t: '' },
+      { t: 'Host script results:', cls: 'b' },
+      { t: '| smb-vuln-ms17-010: ', cls: 'r' },
+      { t: '|   VULNERABLE:', cls: 'r' },
+      { t: '|   Remote Code Execution vulnerability in Microsoft SMBv1 servers (ms17-010)', cls: 'r' },
+      { t: '|     State: VULNERABLE', cls: 'r' },
+      { t: '|     IDs:  CVE:CVE-2017-0143', cls: 'r' },
+      { t: '|     Risk factor: HIGH', cls: 'r' },
+      { t: '|       A critical remote code execution vulnerability exists in Microsoft SMBv1', cls: 'r' },
+      { t: '|       servers (ms17-010).', cls: 'r' },
+      { t: '|     Disclosure date: 2017-03-14', cls: 'd' },
+      { t: '|     References:', cls: 'd' },
+      { t: '|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-0143', cls: 'd' },
+      { t: '|_      https://technet.microsoft.com/en-us/library/security/ms17-010.aspx', cls: 'd' },
+      { t: '' },
+      { t: 'Nmap done: 1 IP address (1 host up) scanned in 7.83 seconds', cls: 'g' },
+    ],
+  },
+
+  // ── msfconsole ───────────────────────────────────────────────────────────────────────────
+  {
+    id: 'msfconsole',
+    match: c => c === 'msfconsole' || c === 'msfconsole -q',
+    loadTime: () => jitter(2800, 600),
+    lines: [{ t: () => { SIM.msf = true; SIM.msfModule = null; return { openMsf: true }; } }],
+  },
+
+  // ── msf: use module ───────────────────────────────────────────────────────
+  {
+    id: 'msf-use',
+    match: c => /^use\s+/.test(c) && c.includes('ms17_010'),
+    lines: [{ t: c => {
+      const mod = c.replace(/^use\s+/, '').trim();
+      SIM.msfModule = mod;
+      SIM.msfOpts[mod] = SIM.msfOpts[mod] || {};
+      return { openMsf: true };
+    }}],
+  },
+
+  // ── msf: set options ──────────────────────────────────────────────────────
+  {
+    id: 'msf-set',
+    match: c => /^set\s+\S+\s+\S+/.test(c) && SIM.msf,
+    lines: [{ t: c => {
+      const parts = c.split(/\s+/);
+      const key = parts[1].toUpperCase();
+      const val = parts.slice(2).join(' ');
+      const mod = SIM.msfModule || '__global__';
+      if (!SIM.msfOpts[mod]) SIM.msfOpts[mod] = {};
+      SIM.msfOpts[mod][key] = val;
+      return { openMsf: true, msfEcho: `${key} => ${val}` };
+    }}],
+  },
+
+  // ── msf: show options ─────────────────────────────────────────────────────
+  {
+    match: c => c === 'show options' && SIM.msf,
+    lines: [{ t: () => {
+      const mod = SIM.msfModule || '';
+      const opts = SIM.msfOpts[mod] || {};
+      return { openMsf: true, msfEcho:
+        `Module options (${mod || 'none loaded'}):\n\n` +
+        `   Name           Current Setting  Required  Description\n` +
+        `   ----           ---------------  --------  -----------\n` +
+        `   RHOSTS         ${(opts.RHOSTS||'').padEnd(15)}  yes       The target host(s)\n` +
+        `   RPORT          445              yes       The target port (TCP)\n` +
+        `   LHOST          ${(opts.LHOST||'').padEnd(15)}  yes       The listen address\n` +
+        `   LPORT          4444             yes       The listen port\n` +
+        `   PAYLOAD        windows/x64/meterpreter/reverse_tcp  yes  The payload`
+      };
+    }}],
+  },
+
+  // ── msf: run / exploit ────────────────────────────────────────────────────
+  {
+    id: 'msf-run',
+    match: c => (c === 'run' || c === 'exploit') && SIM.msf && SIM.msfModule && SIM.msfModule.includes('ms17_010'),
+    stepLines: [
+      { t: '[*] Started reverse TCP handler on 10.10.20.5:4444',                          cls: 'b', delay: 0 },
+      { t: '[*] 10.10.20.10:445 - Connecting to target for exploitation.',                 cls: 'b', delay: jitter(900, 200) },
+      { t: '[+] 10.10.20.10:445 - Connection established for exploitation.',               cls: 'g', delay: jitter(600, 150) },
+      { t: '[+] 10.10.20.10:445 - Target OS selected valid for OS indicated by SMB reply', cls: 'g', delay: jitter(400, 100) },
+      { t: '[*] 10.10.20.10:445 - CORE raw buffer dump (42 bytes)',                        cls: 'b', delay: jitter(300, 80) },
+      { t: '[*] 10.10.20.10:445 - 0x00000000  57 69 6e 64 6f 77 73 20 37 20 55 6c 74 69 6d 61  Windows 7 Ultima', cls: 'd', delay: 100 },
+      { t: '[*] 10.10.20.10:445 - 0x00000010  74 65 20 37 36 30 31 20 53 65 72 76 69 63 65 20  te 7601 Service ', cls: 'd', delay: 100 },
+      { t: '[+] 10.10.20.10:445 - Target arch selected valid for arch indicated by DCE/RPC reply', cls: 'g', delay: jitter(500, 100) },
+      { t: '[*] 10.10.20.10:445 - Trying exploit with 12 Groom Allocations.',              cls: 'b', delay: jitter(800, 200) },
+      { t: '[*] 10.10.20.10:445 - Sending all but last fragment of exploit packet',        cls: 'b', delay: jitter(600, 150) },
+      { t: '[*] 10.10.20.10:445 - Starting non-paged pool grooming',                       cls: 'b', delay: jitter(700, 200) },
+      { t: '[+] 10.10.20.10:445 - Sending SMBv2 buffers',                                  cls: 'g', delay: jitter(500, 100) },
+      { t: '[+] 10.10.20.10:445 - Closing SMBv1 connection creating free hole adjacent to SMBv2 buffer.', cls: 'g', delay: jitter(400, 100) },
+      { t: '[*] 10.10.20.10:445 - Sending final SMBv2 buffers.',                           cls: 'b', delay: jitter(600, 150) },
+      { t: '[*] 10.10.20.10:445 - Sending last fragment of exploit packet!',               cls: 'b', delay: jitter(500, 100) },
+      { t: '[*] 10.10.20.10:445 - Receiving response from exploit packet',                 cls: 'b', delay: jitter(800, 200) },
+      { t: '[+] 10.10.20.10:445 - ETERNALBLUE overwrite completed successfully (0xC000000D)!', cls: 'g', delay: jitter(600, 150) },
+      { t: '[*] 10.10.20.10:445 - Sending egg to corrupted connection.',                   cls: 'b', delay: jitter(400, 100) },
+      { t: '[*] 10.10.20.10:445 - Triggering free of corrupted buffer.',                   cls: 'b', delay: jitter(500, 100) },
+      { t: '[*] Sending stage (200774 bytes) to 10.10.20.10',                              cls: 'b', delay: jitter(1200, 300) },
+      { t: '[*] Meterpreter session 1 opened (10.10.20.5:4444 -> 10.10.20.10:49158)',      cls: 'g', delay: jitter(1000, 200) },
+      { t: '',                                                                               delay: 300 },
+    ],
+    lines: [],
+    after: () => { SIM.legacyPwned = true; SIM.msfMeter = true; SIM.msfMeterId = 1; SIM.msfSessions = [{ id: 1, type: 'meterpreter', host: '10.10.20.10' }]; },
+  },
+
+  // ── msf: getuid / sysinfo ─────────────────────────────────────────────────
+  {
+    id: 'msf-getuid',
+    match: c => (c === 'getuid' || c === 'sysinfo' || c === 'getuid\nsysinfo') && SIM.msfMeter,
+    lines: [{ t: c => {
+      if (c === 'sysinfo') return { openMsf: true, msfEcho:
+        'Computer        : WIN7-PC\n' +
+        'OS              : Windows 7 (6.1 Build 7601, Service Pack 1).\n' +
+        'Architecture    : x64\n' +
+        'System Language : en_US\n' +
+        'Domain          : WORKGROUP\n' +
+        'Logged On Users : 2\n' +
+        'Meterpreter     : x64/windows'
+      };
+      return { openMsf: true, msfEcho: 'Server username: NT AUTHORITY\\SYSTEM' };
+    }}],
+  },
+
+  // ── msf: hashdump ─────────────────────────────────────────────────────────
+  {
+    id: 'msf-hashdump',
+    loadTime: () => jitter(1800, 400),
+    match: c => c === 'hashdump' && SIM.msfMeter,
+    lines: [{ t: () => ({ openMsf: true, msfEcho:
+      'Administrator:500:aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889:::' + '\n' +
+      'Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::' + '\n' +
+      'WIN7-PC$:1000:aad3b435b51404eeaad3b435b51404ee:a87f3a337d73085c45f9416be5787d86:::'
+    })}],
+  },
+
+  // ── msf: shell (drop to windows cmd) ─────────────────────────────────────
+  {
+    match: c => c === 'shell' && SIM.msfMeter,
+    loadTime: () => jitter(800, 200),
+    lines: [{ t: () => {
+      SIM.msfMeterWin = true;
+      return { openMsf: true, msfEcho: 'Process 1337 created.\nChannel 1 created.\nMicrosoft Windows [Version 6.1.7601]\n(c) 2009 Microsoft Corporation. All rights reserved.\n\nC:\\Windows\\system32>' };
+    }}],
+  },
+
+  // ── msf: meterpreter windows shell — type secret.txt ─────────────────────
+  {
+    id: 'msf-shell-loot',
+    match: c => SIM.msfMeterWin && c.toLowerCase().includes('secret.txt'),
+    lines: [{ t: () => ({ openMsf: true, msfEcho:
+      'FLAG{secret_docs_exfiltrated}\n' +
+      '\n' +
+      'Project Nightfall — Eyes Only\n' +
+      'Target acquisition complete. Funds transferred.\n' +
+      'Do not discuss on unsecured channels.'
+    })}],
+  },
+
+  // ── msf: sessions ─────────────────────────────────────────────────────────
+  {
+    match: c => /^sessions/.test(c) && SIM.msf,
+    lines: [{ t: () => {
+      if (!SIM.msfSessions.length) return { openMsf: true, msfEcho: 'No active sessions.' };
+      return { openMsf: true, msfEcho:
+        'Active sessions\n' +
+        '===============\n\n' +
+        '  Id  Name  Type                     Information                   Connection\n' +
+        '  --  ----  ----                     -----------                   ----------\n' +
+        `  1         meterpreter x64/windows  NT AUTHORITY\\SYSTEM @ WIN7-PC  10.10.20.5:4444 -> 10.10.20.10:49158`
+      };
+    }}],
+  },
+
+  // ── msf: search ───────────────────────────────────────────────────────────
+  {
+    match: c => /^search\s+/.test(c) && SIM.msf,
+    lines: [{ t: c => {
+      const q = c.replace(/^search\s+/, '').trim();
+      return { openMsf: true, msfEcho:
+        `Matching Modules\n` +
+        `================\n\n` +
+        `   #  Name                                      Disclosure Date  Rank    Check  Description\n` +
+        `   -  ----                                      ---------------  ----    -----  -----------\n` +
+        (q.includes('17') || q.includes('eternal') || q.includes('smb')
+          ? `   0  exploit/windows/smb/ms17_010_eternalblue  2017-03-14       great   Yes    MS17-010 EternalBlue SMB Remote Windows Kernel Pool Corruption\n` +
+            `   1  exploit/windows/smb/ms17_010_psexec       2017-03-14       normal  Yes    MS17-010 EternalRomance/EternalSynergy/EternalChampion SMB Remote Windows Code Execution`
+          : `   0  (no results for '${q}')`)
+      };
+    }}],
+  },
+
+  // ── msf: info ─────────────────────────────────────────────────────────────
+  {
+    match: c => c === 'info' && SIM.msf && SIM.msfModule,
+    lines: [{ t: () => ({ openMsf: true, msfEcho:
+      `       Name: MS17-010 EternalBlue SMB Remote Windows Kernel Pool Corruption\n` +
+      `     Module: exploit/windows/smb/ms17_010_eternalblue\n` +
+      `   Platform: Windows\n` +
+      `       Arch: x86, x64\n` +
+      `Privileged?: Yes\n` +
+      `    License: Metasploit Framework License (BSD)\n` +
+      `       Rank: Great\n\n` +
+      `Provided by:\n  Sean Dillon <sean.dillon@risksense.com>\n  Dylan Davis <dylan.davis@risksense.com>\n\n` +
+      `Description:\n  This module exploits a vulnerability in the SMBv1 protocol.\n` +
+      `  The vulnerability allows remote code execution via a specially crafted\n` +
+      `  packet. This was used by the WannaCry ransomware in May 2017.`
+    })}],
+  },
+
+  // ── msf: back ─────────────────────────────────────────────────────────────
+  {
+    match: c => c === 'back' && SIM.msf,
+    lines: [{ t: () => { SIM.msfModule = null; return { openMsf: true }; } }],
+  },
+
+  // ── msf: exit / quit ──────────────────────────────────────────────────────
+  {
+    match: c => (c === 'exit' || c === 'quit') && SIM.msf,
+    lines: [{ t: () => { SIM.msf = false; SIM.msfModule = null; SIM.msfMeter = false; SIM.msfMeterWin = false; return ''; } }],
+  },
+
   // ── Help / misc ───────────────────────────────────────────────────────────
   {
     match: c => c === 'help' || c === 'help --ctf',
@@ -2695,11 +3001,17 @@ function runCommand(rawInput) {
     SIM.hashesOnDisk = false;
     SIM.lootExfiltrated = false;
     SIM.dirs = new Set();
+    SIM.msf = false; SIM.msfModule = null; SIM.msfOpts = {};
+    SIM.msfSessions = []; SIM.msfMeter = false; SIM.msfMeterId = null; SIM.msfMeterWin = false;
+    SIM.legacyPwned = false;
     SIM.files = Object.fromEntries(Object.entries(SIM.files).filter(([k]) => k.startsWith('/etc') || k.startsWith('/home/' + savedUser + '/.') || k === '/home/' + savedUser + '/notes.txt' || k === '/root/notes.txt'));
     if (typeof CTF !== 'undefined') CTF._reset?.();
     return { clear: true };
   }
-  if (cmd === 'exit' || cmd === 'logout') return { lines: [{ t: 'Type exit in your browser to close the tab.', cls: 'd' }] };
+  if (cmd === 'exit' || cmd === 'logout') {
+    if (SIM.user === 'root') return { dropRoot: true };
+    return { lines: [{ t: 'Type exit in your browser to close the tab.', cls: 'd' }] };
+  }
 
   // Walk handlers in order, first match wins
   for (const h of HANDLERS) {
@@ -2718,6 +3030,14 @@ function runCommand(rawInput) {
       }));
       // openEditor result — returned as object inside lines[0].t
       if (lines.length === 1 && lines[0].t && typeof lines[0].t === 'object' && lines[0].t.openEditor) {
+        return lines[0].t;
+      }
+      // openMsf result
+      if (lines.length === 1 && lines[0].t && typeof lines[0].t === 'object' && lines[0].t.openMsf) {
+        return lines[0].t;
+      }
+      // history result
+      if (lines.length === 1 && lines[0].t && typeof lines[0].t === 'object' && lines[0].t.history) {
         return lines[0].t;
       }
       const loadTime = typeof h.loadTime === 'function' ? h.loadTime(cmd) : (h.loadTime || 0);

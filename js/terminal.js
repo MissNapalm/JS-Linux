@@ -18,7 +18,27 @@ function createTerminal() {
     _sudoAttempts: 0,
     _inputBuf: '',
     _cursorPos: 0,
-    _nano: null,  // nano editor state, null when not active
+    _nano: null,
+    // per-tab shell state (shadows SIM for isolation between tabs)
+    _user: null,
+    _cwd: null,
+    _windowsShell: false,
+    _winCwd: 'C:\\Windows\\system32',
+
+    // push this tab's state into SIM before running a command
+    _simPush() {
+      if (this._user !== null) SIM.user = this._user;
+      if (this._cwd  !== null) SIM.cwd  = this._cwd;
+      SIM.windowsShell = this._windowsShell;
+      SIM.winCwd       = this._winCwd;
+    },
+    // pull SIM state back into this tab after a command
+    _simPull() {
+      this._user         = SIM.user;
+      this._cwd          = SIM.cwd;
+      this._windowsShell = SIM.windowsShell;
+      this._winCwd       = SIM.winCwd;
+    },
 
     init(container) {
       const TermClass = (typeof Terminal === 'function') ? Terminal
@@ -66,13 +86,19 @@ function createTerminal() {
       this._xterm.focus();
 
       this._printWelcome();
+      // new tabs always start as the registered user, never inherit root from another tab
+      const registeredUser = localStorage.getItem('hacklet_user') || 'capy';
+      this._user = registeredUser;
+      this._cwd  = '/home/' + registeredUser;
+      this._windowsShell = false;
+      this._winCwd = 'C:\\Windows\\system32';
       this._writePrompt();
       this._xterm.onData(d => this._onData(d));
 
       // Block browser from stealing Ctrl+W / Ctrl+S when nano is active
       // Also block Tab from moving browser focus away from terminal
       this._xterm.textarea?.addEventListener('keydown', e => {
-        if (e.key === 'Tab') { e.preventDefault(); return; }
+        if (e.key === 'Tab') { e.preventDefault(); }
         if (this._nano && (e.ctrlKey || e.metaKey)) {
           const blocked = ['w','s','r','f','g','k','u','x','o','\\'];
           if (blocked.includes(e.key.toLowerCase())) e.preventDefault();
@@ -106,9 +132,11 @@ function createTerminal() {
     },
 
     _printLines(lines) {
+      // skip if only output is a single empty string (silent success)
+      if (lines.length === 1 && (lines[0].t === '' || lines[0].t === null || lines[0].t === undefined)) return;
       for (const l of lines) {
-        if (l.t === '') this._xterm.writeln('');
-        else this._writeLine(l.t, l.cls);
+        if (l.t === '' || l.t === null || l.t === undefined) { this._xterm.writeln(''); continue; }
+        this._writeLine(l.t, l.cls);
       }
     },
 
@@ -116,16 +144,29 @@ function createTerminal() {
 
     // ── Prompt ──────────────────────────────────────────────────────────────
     _writePrompt() {
-      if (SIM.windowsShell) {
-        this._xterm.write('\x1b[33m' + SIM.winCwd + '>\x1b[0m ');
+      if (SIM.msf) {
+        if (SIM.msfMeterWin) {
+          this._xterm.write('\x1b[33mC:\\Windows\\system32>\x1b[0m ');
+        } else if (SIM.msfMeter) {
+          this._xterm.write('\x1b[1;31mmeterpreter\x1b[0m \x1b[31m>\x1b[0m ');
+        } else if (SIM.msfModule) {
+          const short = SIM.msfModule.split('/').pop();
+          this._xterm.write(`\x1b[1;31mmsf6\x1b[0m \x1b[31mexploit\x1b[0m(\x1b[1;33m${short}\x1b[0m) \x1b[31m>\x1b[0m `);
+        } else {
+          this._xterm.write('\x1b[1;31mmsf6\x1b[0m \x1b[31m>\x1b[0m ');
+        }
         return;
       }
-      const user  = SIM.user;
+      if (this._windowsShell) {
+        this._xterm.write('\x1b[33m' + this._winCwd + '>\x1b[0m ');
+        return;
+      }
+      const user  = this._user || SIM.user;
       const home  = user === 'root' ? '/root' : '/home/' + user;
-      const cwd   = SIM.cwd === home ? '~' : SIM.cwd;
+      const cwd   = (this._cwd || SIM.cwd) === home ? '~' : (this._cwd || SIM.cwd);
       const sigil = user === 'root' ? '#' : '$';
       this._xterm.writeln(
-        '\x1b[35m┌──(\x1b[0m\x1b[1;32m' + user + '@capy\x1b[0m' +
+        '\x1b[35m┌──(\x1b[0m\x1b[32m' + user + '@capy\x1b[0m' +
         '\x1b[35m)-[\x1b[0m\x1b[94m' + cwd + '\x1b[0m\x1b[35m]\x1b[0m'
       );
       this._xterm.write('\x1b[35m└─\x1b[0m\x1b[97m' + sigil + ' \x1b[0m');
@@ -178,7 +219,7 @@ function createTerminal() {
               this._writePrompt();
             } else {
               this._xterm.writeln('\x1b[31mSorry, try again.\x1b[0m');
-              this._xterm.write('\x1b[90m[sudo] password for ' + SIM.user + ': \x1b[0m');
+              this._xterm.write('\x1b[90m[sudo] password for ' + (this._user || SIM.user) + ': \x1b[0m');
             }
           }
         } else if (data === '\x7f') {
@@ -259,17 +300,146 @@ function createTerminal() {
       }
       // Tab completion
       if (data === '\t') {
+        const buf = this._inputBuf.slice(0, this._cursorPos);
+        // ── filename/dir completion ───────────────────────────────────────────────────────────────────────────
+        // Build entries for a directory — mirrors the ls handler
+        const _getDirEntries = (dir) => {
+          const u = this._user || SIM.user;
+          const h = '/home/' + u;
+          const map = {
+            [h]:                    { dirs: ['Desktop','Documents','Downloads','Music','Pictures','Public','Templates','Videos','.ssh','.config','.local','.msf4'], files: ['notes.txt','.bash_history','.bash_logout','.bashrc','.profile','.zshrc'] },
+            [h+'/Desktop']:         { dirs: [], files: ['README.txt'] },
+            [h+'/Documents']:       { dirs: ['reports','tools'], files: ['credentials.txt','network_notes.md'] },
+            [h+'/Downloads']:       { dirs: [], files: ['linpeas.sh','winpeas.exe','mimikatz.zip'] },
+            [h+'/Documents/reports']:{ dirs: [], files: ['pentest_report_draft.md','scope.txt'] },
+            [h+'/Documents/tools']: { dirs: [], files: ['nmap_cheatsheet.txt','ad_attack_notes.txt'] },
+            [h+'/.ssh']:            { dirs: [], files: ['known_hosts','id_rsa','id_rsa.pub'] },
+            [h+'/.config']:         { dirs: ['xfce4','gtk-3.0','pulse'], files: [] },
+            [h+'/.local']:          { dirs: ['share','bin'], files: [] },
+            [h+'/.msf4']:           { dirs: ['logs','loot','modules','plugins'], files: ['history'] },
+            '/':                    { dirs: ['bin','boot','dev','etc','home','lib','lib64','media','mnt','opt','proc','root','run','sbin','srv','sys','tmp','usr','var'], files: [] },
+            '/root':                { dirs: ['Desktop','Documents','Downloads','.msf4','.ssh','.config'], files: ['notes.txt','root.txt','.bash_history','.bashrc','.profile'] },
+            '/root/Documents':      { dirs: [], files: ['loot.txt'] },
+            '/root/Downloads':      { dirs: [], files: ['linpeas.sh','chisel'] },
+            '/root/.ssh':           { dirs: [], files: ['known_hosts','authorized_keys'] },
+            '/home':                { dirs: [u], files: [] },
+            '/etc':                 { dirs: ['apt','cron.d','cron.daily','cron.weekly','default','init.d','ld.so.conf.d','logrotate.d','network','pam.d','security','ssl','ssh','systemd','udev','X11'], files: ['bash.bashrc','crontab','environment','fstab','group','gshadow','hostname','hosts','hosts.allow','hosts.deny','issue','issue.net','locale.gen','login.defs','motd','mtab','nsswitch.conf','os-release','passwd','profile','protocols','resolv.conf','services','shadow','shells','sudoers','sysctl.conf','timezone'] },
+            '/etc/ssh':             { dirs: [], files: ['ssh_config','sshd_config','ssh_host_ecdsa_key.pub','ssh_host_ed25519_key.pub','ssh_host_rsa_key.pub'] },
+            '/etc/apt':             { dirs: ['sources.list.d','trusted.gpg.d','preferences.d'], files: ['sources.list'] },
+            '/etc/systemd':         { dirs: ['system','user','network','resolved.conf.d'], files: ['journald.conf','logind.conf','resolved.conf','system.conf','timesyncd.conf','user.conf'] },
+            '/etc/ssl':             { dirs: ['certs','private'], files: ['openssl.cnf'] },
+            '/etc/pam.d':           { dirs: [], files: ['common-auth','common-account','common-password','common-session','login','sshd','sudo','su'] },
+            '/tmp':                 { dirs: ['systemd-private-abc123'], files: ['sysinfo.txt','.font-unix','.ICE-unix','.X11-unix'] },
+            '/opt':                 { dirs: ['metasploit-framework','impacket','crackmapexec','kerbrute','chisel'], files: [] },
+            '/opt/metasploit-framework': { dirs: ['bin','data','modules','plugins','scripts','tools'], files: ['README.md','LICENSE'] },
+            '/opt/impacket':        { dirs: ['impacket','examples','build'], files: ['README.md','setup.py'] },
+            '/proc':                { dirs: ['1','2','432','591','623','1234','net'], files: ['cpuinfo','meminfo','version','uptime','loadavg','mounts'] },
+            '/proc/net':            { dirs: [], files: ['arp','dev','route','tcp','tcp6','udp','udp6'] },
+            '/dev':                 { dirs: ['block','bus','char','disk','input','mapper','net','pts','shm','snd'], files: ['console','null','random','sda','sda1','sda2','stderr','stdin','stdout','tty','urandom','zero'] },
+            '/sys':                 { dirs: ['block','bus','class','dev','devices','firmware','fs','kernel','module','power'], files: [] },
+            '/run':                 { dirs: ['lock','log','mount','network','sshd','systemd','udev','user'], files: ['motd.dynamic','utmp'] },
+            '/media':               { dirs: [u], files: [] },
+            '/mnt':                 { dirs: [], files: [] },
+            '/srv':                 { dirs: ['http','ftp'], files: [] },
+            '/boot':                { dirs: ['grub','efi'], files: ['config-6.6.9-amd64','initrd.img-6.6.9-amd64','vmlinuz-6.6.9-amd64'] },
+            '/usr':                 { dirs: ['bin','include','lib','lib32','lib64','local','sbin','share','src'], files: [] },
+            '/usr/bin':             { dirs: [], files: ['awk','base64','crackmapexec','curl','cut','dig','dpkg','enum4linux','file','gobuster','gpg','hashcat','head','htop','hydra','impacket-GetUserSPNs','impacket-psexec','impacket-secretsdump','john','kerbrute','md5sum','nano','netcat','nmap','openssl','python3','sha256sum','sort','ssh','ssh-keygen','strace','strings','tail','tcpdump','top','traceroute','vim','wc','wget','whoami','xxd'] },
+            '/usr/sbin':            { dirs: [], files: ['adduser','apache2','cron','dmidecode','iptables','nft','sshd','tcpdump','useradd'] },
+            '/usr/local':           { dirs: ['bin','etc','include','lib','sbin','share','src'], files: [] },
+            '/usr/share':           { dirs: ['applications','doc','fonts','icons','man','metasploit-framework','nmap','wordlists','zsh'], files: [] },
+            '/usr/share/wordlists': { dirs: ['dirb','dirbuster','metasploit','nmap','wfuzz'], files: ['fasttrack.txt','rockyou.txt'] },
+            '/usr/share/nmap':      { dirs: ['nselib','scripts'], files: ['nmap-services','nmap-os-db','nmap-payloads'] },
+            '/var':                 { dirs: ['backups','cache','lib','lock','log','mail','opt','run','spool','tmp'], files: [] },
+            '/var/log':             { dirs: ['apt','journal','nginx'], files: ['auth.log','bootstrap.log','dpkg.log','kern.log','syslog'] },
+            '/var/log/apt':         { dirs: [], files: ['history.log','term.log'] },
+            '/var/lib':             { dirs: ['apt','dpkg','misc','NetworkManager','systemd','udev'], files: [] },
+            '/var/cache':           { dirs: ['apt','debconf','ldconfig','man'], files: [] },
+          };
+          const entry = map[dir];
+          if (!entry) {
+            // fallback: scan simFiles for entries in this dir
+            const result = { dirs: [], files: [] };
+            const slash = dir === '/' ? '/' : dir + '/';
+            for (const f of Object.keys(simFiles())) {
+              if (f.startsWith(slash)) {
+                const rest = f.slice(slash.length);
+                if (!rest.includes('/')) result.files.push(rest);
+              }
+            }
+            for (const d of SIM.dirs) {
+              if (d.startsWith(slash)) {
+                const rest = d.slice(slash.length);
+                if (!rest.includes('/')) result.dirs.push(rest);
+              }
+            }
+            return result;
+          }
+          // also merge runtime-created files/dirs
+          const slash2 = dir === '/' ? '/' : dir + '/';
+          for (const f of Object.keys(simFiles())) {
+            if (f.startsWith(slash2)) {
+              const rest = f.slice(slash2.length);
+              if (!rest.includes('/') && !entry.files.includes(rest)) entry.files.push(rest);
+            }
+          }
+          for (const d of SIM.dirs) {
+            if (d.startsWith(slash2)) {
+              const rest = d.slice(slash2.length);
+              if (!rest.includes('/') && !entry.dirs.includes(rest)) entry.dirs.push(rest);
+            }
+          }
+          return entry;
+        };
+
+        const spaceIdx = buf.lastIndexOf(' ');
+        const partial = spaceIdx === -1 ? buf : buf.slice(spaceIdx + 1);
+        if (partial) {
+          // resolve directory to search
+          const slashIdx = partial.lastIndexOf('/');
+          const dirPart  = slashIdx === -1 ? '' : partial.slice(0, slashIdx + 1);
+          const filePart = slashIdx === -1 ? partial : partial.slice(slashIdx + 1);
+          const searchDir = dirPart
+            ? (dirPart.startsWith('/') ? dirPart.replace(/\/$/, '') : ((this._cwd || SIM.cwd) + '/' + dirPart).replace(/\/$/, ''))
+            : (this._cwd || SIM.cwd);
+          // collect entries using the same map as ls
+          const entry = _getDirEntries(searchDir);
+          const allEntries = [
+            ...entry.dirs.map(d => d + '/'),
+            ...entry.files,
+          ];
+          const matches = [...new Set(allEntries)].filter(e => e.startsWith(filePart) && e !== filePart);
+          if (matches.length === 1) {
+            const prefix = buf.slice(0, spaceIdx === -1 ? 0 : spaceIdx + 1);
+            const completed = prefix + dirPart + matches[0];
+            this._inputBuf = completed;
+            this._cursorPos = completed.length;
+            // redraw: move to start of input, erase, rewrite
+            if (buf.length > 0) this._xterm.write('\x1b[' + buf.length + 'D');
+            this._xterm.write('\x1b[K' + completed);
+            return;
+          } else if (matches.length > 1) {
+            this._xterm.writeln('');
+            this._writeLine(matches.join('  '), 'd');
+            this._writePrompt();
+            this._xterm.write(buf);
+            this._cursorPos = buf.length;
+            this._inputBuf = buf;
+            return;
+          }
+        }
+        // ── command completion ───────────────────────────────────────────────────────────────────────────
         const completions = [
           'sudo nmap ','sudo apt-get update','sudo apt-get install ',
           'nmap ','enum4linux ','crackmapexec smb 10.10.10.10 ',
           'impacket-GetUserSPNs ','impacket-secretsdump ','impacket-psexec ',
-          'john ','hashcat ','cat ','ls','pwd','help','whoami','cd ','reset',
+          'msfconsole','john ','hashcat ','cat ','ls','pwd','help','whoami','cd ','reset',
+          'nano ','vim ','find ','grep ','chmod ','mkdir ','touch ','rm ',
           'lscpu','lsblk','lspci','lsusb','hostnamectl','timedatectl',
           'dmidecode','vmstat','iostat','dmesg','journalctl',
           'ss -tulpn','netstat -tulpn','dig ','traceroute ',
           'dpkg -l','stat ','file ','xxd ','md5sum ','sha256sum ',
         ];
-        const match = completions.find(c => c.startsWith(this._inputBuf) && c !== this._inputBuf);
+        const match = completions.find(c => c.startsWith(buf) && c !== buf);
         if (match) this._setInput(match);
         return;
       }
@@ -295,7 +465,7 @@ function createTerminal() {
       const rows = this._xterm.rows || 24;
       this._nano = {
         filename,
-        filepath: filepath || (filename.startsWith('/') ? filename : SIM.cwd.replace(/\/?$/, '/') + filename),
+        filepath: filepath || (filename.startsWith('/') ? filename : (this._cwd || SIM.cwd).replace(/\/?$/, '/') + filename),
         lines: content.split('\n'),
         cx: 0,
         cy: 0,
@@ -402,7 +572,7 @@ function createTerminal() {
           const fname = n.promptBuf.trim();
           if (fname) {
             n.filename = fname;
-            const abs = fname.startsWith('/') ? fname : SIM.cwd.replace(/\/?$/, '/') + fname;
+            const abs = fname.startsWith('/') ? fname : (this._cwd || SIM.cwd).replace(/\/?$/, '/') + fname;
             n.filepath = abs;
             SIM.files[abs] = n.lines.join('\n');
             n.dirty = false;
@@ -673,7 +843,9 @@ function createTerminal() {
     async _runCommand(raw) {
       if (raw.trim()) { this._history.push(raw.trim()); this._histIdx = -1; }
 
+      this._simPush();
       const result = runCommand(raw);
+      this._simPull();
       if (!result) { this._writePrompt(); return; }
 
       if (result.clear) {
@@ -683,15 +855,44 @@ function createTerminal() {
         return;
       }
 
+      if (result.dropRoot) {
+        const registeredUser = localStorage.getItem('hacklet_user') || 'capy';
+        this._user = registeredUser;
+        this._cwd  = '/home/' + registeredUser;
+        SIM.user = registeredUser;
+        SIM.cwd  = this._cwd;
+        this._writeLine('logout', 'd');
+        this._writePrompt();
+        return;
+      }
+
       if (result.waitSudo) {
         this._sudoPendingCmd = result.pendingCmd;
         this._inputBuf = '';
-        this._xterm.write('\x1b[90m[sudo] password for ' + SIM.user + ': \x1b[0m');
+        this._xterm.write('\x1b[90m[sudo] password for ' + (this._user || SIM.user) + ': \x1b[0m');
         return;
       }
 
       if (result.openEditor) {
         this._nanoOpen(result.filename, result.content, result.filepath);
+        return;
+      }
+
+      if (result.openMsf) {
+        if (result.msfEcho) this._writeLine(result.msfEcho, 'g');
+        this._writePrompt();
+        if (result.id) {
+          const captured = CTF.check(result);
+          if (captured) CTF._renderSidebar();
+        }
+        return;
+      }
+
+      if (result.history) {
+        this._history.forEach((cmd, i) => {
+          this._writeLine(String(i + 1).padStart(5) + '  ' + cmd, '');
+        });
+        this._writePrompt();
         return;
       }
 
@@ -736,11 +937,13 @@ function createTerminal() {
 
     async _runSudoCmd(pendingCmd) {
       this._sudoPendingCmd = null; this._inputBuf = '';
+      this._simPush();
       const wasRoot = SIM.user === 'root';
       if (!wasRoot) SIM.user = 'root';
       const result = runCommand(pendingCmd);
       const permanentRoot = /^(-i$|-s\s*$|su(\s|$))/.test(pendingCmd.trim());
-      if (!wasRoot && !permanentRoot) SIM.user = 'capy';
+      if (!wasRoot && !permanentRoot) SIM.user = this._user || 'capy';
+      this._simPull();
       if (!result) { this._writePrompt(); return; }
       if (result.clear) { this._xterm.clear(); this._writePrompt(); return; }
 
@@ -814,7 +1017,9 @@ function createTerminal() {
           if (prevLineCount > 0) {
             this._xterm.write('\x1b[' + prevLineCount + 'A\x1b[J');
           }
-          const lines = displayFn(tick++);
+          const maxRows = (this._xterm.rows || 24) - 2; // leave room for prompt
+          const allLines = displayFn(tick++);
+          const lines = allLines.slice(0, maxRows);
           prevLineCount = 0;
           for (const l of lines) {
             const text = String(l.t ?? '');
