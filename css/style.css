@@ -27,6 +27,19 @@ button { cursor: pointer; font-family: inherit; }
   box-shadow: 0 2px 6px rgba(0,0,0,0.06), 0 8px 30px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05);
   transition: box-shadow 0.15s;
 }
+
+/* ── Resize handles ───────────────────────────────────────────────────────── */
+.win-resize {
+  position: absolute; z-index: 10;
+}
+.win-resize-e  { top: 12px; right: 0;  width: 5px; bottom: 12px; cursor: e-resize; }
+.win-resize-w  { top: 12px; left: 0;   width: 5px; bottom: 12px; cursor: w-resize; }
+.win-resize-s  { left: 12px; bottom: 0; height: 5px; right: 12px; cursor: s-resize; }
+.win-resize-n  { left: 12px; top: 0;   height: 5px; right: 12px; cursor: n-resize; }
+.win-resize-se { right: 0;  bottom: 0; width: 14px; height: 14px; cursor: se-resize; }
+.win-resize-sw { left: 0;   bottom: 0; width: 14px; height: 14px; cursor: sw-resize; }
+.win-resize-ne { right: 0;  top: 0;    width: 14px; height: 14px; cursor: ne-resize; }
+.win-resize-nw { left: 0;   top: 0;    width: 14px; height: 14px; cursor: nw-resize; }
 .window.focused {
   box-shadow: 0 4px 12px rgba(0,0,0,0.09), 0 24px 60px rgba(0,0,0,0.17), 0 0 0 1px rgba(109,40,217,0.18);
 }
@@ -158,7 +171,15 @@ button { cursor: pointer; font-family: inherit; }
 .ctf-pts { font-size: 10.5px; color: #94a3b8; font-family: ui-sans-serif, system-ui, sans-serif; }
 .ctf-item.done .ctf-pts { color: #7c3aed; }
 .ctf-flag { font-size: 10px; color: #b45309; padding-left: 28px; margin-top: 3px; word-break: break-all; font-family: 'Courier New', monospace; }
-.ctf-hint { font-size: 10px; color: #94a3b8; padding-left: 28px; margin-top: 2px; font-family: ui-sans-serif, system-ui, sans-serif; word-break: break-all; }
+.ctf-hint-row { display: flex; align-items: center; gap: 4px; padding-left: 28px; margin-top: 2px; }
+.ctf-hint { font-size: 10px; color: #94a3b8; flex: 1; font-family: ui-sans-serif, system-ui, sans-serif; word-break: break-all; }
+.ctf-copy-btn {
+  flex-shrink: 0; background: transparent; border: 1px solid #e2e8f0;
+  color: #94a3b8; border-radius: 4px; padding: 1px 5px; font-size: 10px;
+  cursor: pointer; transition: color 0.1s, border-color 0.1s, background 0.1s;
+  line-height: 1.6;
+}
+.ctf-copy-btn:hover { color: #7c3aed; border-color: #c4b5fd; background: #f5f3ff; }
 
 /* CTF toggle button active state */
 #ctf-toggle-btn.active-btn { background: #ede9fe; border-color: #7c3aed; color: #5b21b6; }

@@ -1,63 +1,9 @@
 'use strict';
 (function() {
 
-  const BOOT_LINES = [
-    '[    0.000000] Linux version 6.6.9-amd64 (debian-kernel@lists.debian.org)',
-    '[    0.001234] BIOS-provided physical RAM map:',
-    '[    0.234512] ACPI: RSDP 0x00000000000F0490 000024 (v02 BOCHS)',
-    '[    0.891203] PCI: Using configuration type 1 for base access',
-    '[    1.453211] Initializing cgroup subsys cpuset',
-    '[    1.823401] NET: Registered PF_INET6 protocol family',
-    '[    2.102341] SCSI subsystem initialized',
-    '[    3.001923] EXT4-fs (sda1): mounted filesystem with ordered data mode',
-    '[    3.234512] systemd[1]: Detected virtualization kvm.',
-    '[    3.567891] systemd[1]: Starting kali-linux.service...',
-    '[    4.123401] Starting Network Manager...',
-    '[    4.567234] eth0: renamed from veth9c8b2e1',
-    '[    4.789012] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready',
-    '[    5.012345] systemd[1]: Started OpenBSD Secure Shell server.',
-    '[    5.234567] systemd[1]: Reached target Multi-User System.',
-    '[    5.400000] kali login: ',
-  ];
+  initDesktop();
 
-  // ── Boot ──────────────────────────────────────────────────────────────────
-  const bootEl    = document.getElementById('boot');
-  const bootLogEl = document.getElementById('boot-log');
-  const bootBarEl = document.getElementById('boot-bar');
-  const loginEl   = document.getElementById('login');
-  const desktopEl = document.getElementById('desktop');
-
-  let msgIdx = 0, progress = 0;
-  const iv = setInterval(() => {
-    if (msgIdx < BOOT_LINES.length) bootLogEl.textContent += BOOT_LINES[msgIdx++] + '\n';
-    progress = Math.min(100, progress + 100 / BOOT_LINES.length);
-    bootBarEl.style.width = progress + '%';
-    if (progress >= 100) {
-      clearInterval(iv);
-      setTimeout(() => {
-        bootEl.style.opacity = '0'; bootEl.style.transition = 'opacity 0.4s';
-        setTimeout(() => {
-          bootEl.style.display = 'none';
-          loginEl.classList.remove('hidden');
-          document.getElementById('login-pass').focus();
-        }, 400);
-      }, 300);
-    }
-  }, 120);
-
-  // ── Login ─────────────────────────────────────────────────────────────────
-  function doLogin() {
-    loginEl.style.opacity = '0'; loginEl.style.transition = 'opacity 0.35s';
-    setTimeout(() => {
-      loginEl.style.display = 'none';
-      desktopEl.classList.remove('hidden');
-      initDesktop();
-    }, 350);
-  }
-  document.getElementById('login-btn').addEventListener('click', doLogin);
-  document.getElementById('login-pass').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-
-  // ── Desktop ───────────────────────────────────────────────────────────────
+  // ── Desktop ─────────────────────────────────────────────────────────────────
   function initDesktop() {
     const clockEl = document.getElementById('clock');
     function tick() {

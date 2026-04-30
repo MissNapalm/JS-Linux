@@ -76,6 +76,7 @@ const HANDLERS = [
   {
     id: 'become-root',
     match: c => c === '-i' || c === 'su' || c === 'su -' || c === '-s /bin/bash',
+    loadTime: () => jitter(800, 200),
     lines: [],   // prompt change only
     after: (c) => { SIM.user = 'root'; if (c === '-i' || c === 'su -') SIM.cwd = '/root'; },
   },
@@ -112,6 +113,7 @@ const HANDLERS = [
   },
   {
     match: c => /^apt(-get)?\s+upgrade/.test(c),
+    loadTime: () => jitter(1800, 500),
     lines: [
       { t: 'Reading package lists... Done' },
       { t: 'Building dependency tree... Done' },
@@ -354,6 +356,7 @@ const HANDLERS = [
   },
   {
     match: c => c.startsWith('ping'),
+    loadTime: () => jitter(3200, 400),
     lines: [
       { t: (c) => `PING ${c.split(' ').pop()} 56(84) bytes of data.` },
       { t: (c) => `64 bytes from ${c.split(' ').pop()}: icmp_seq=1 ttl=128 time=1.23 ms` },
@@ -598,6 +601,7 @@ const HANDLERS = [
   // ── john --show ───────────────────────────────────────────────────────────
   {
     match: c => /^john\b/.test(c) && c.includes('--show'),
+    loadTime: () => jitter(400, 100),
     lines: [
       { t: 'svc_backup:Backup2023!:CORP.LOCAL:backup/dc01.corp.local:$krb5tgs$23$*svc_backup$...', cls: 'g' },
       { t: 'svc_sql:SqlServer1!:CORP.LOCAL:MSSQLSvc/dc01.corp.local:1433:$krb5tgs$23$*svc_sql$...', cls: 'g' },
@@ -790,6 +794,7 @@ const HANDLERS = [
   // ── ps ────────────────────────────────────────────────────────────────────
   {
     match: c => /^ps(\s|$)/.test(c),
+    loadTime: () => jitter(300, 80),
     lines: [{ t: c => {
       const isAux = c.includes('aux') || c.includes('-aux') || c.includes('a');
       if (isAux) return [
@@ -815,6 +820,7 @@ const HANDLERS = [
   // ── ss / netstat ─────────────────────────────────────────────────────────
   {
     match: c => /^(ss|netstat)(\s|$)/.test(c),
+    loadTime: () => jitter(250, 60),
     lines: [
       { t: 'Netid  State   Recv-Q  Send-Q  Local Address:Port  Peer Address:Port' },
       { t: 'tcp    LISTEN  0       128     0.0.0.0:22         0.0.0.0:*', cls: 'g' },
@@ -867,6 +873,7 @@ const HANDLERS = [
   // ── find ─────────────────────────────────────────────────────────────────
   {
     match: c => /^find\s/.test(c),
+    loadTime: () => jitter(500, 150),
     lines: [{ t: (c) => {
       if (c.includes('.kerberoast') || c.includes('hash')) return SIM.hashesOnDisk ? '/home/kali/hashes.kerberoast' : '';
       if (c.includes('wordlist') || c.includes('rockyou')) return '/usr/share/wordlists/rockyou.txt';
@@ -878,6 +885,7 @@ const HANDLERS = [
   // ── grep ─────────────────────────────────────────────────────────────────
   {
     match: c => /^grep\s/.test(c),
+    loadTime: () => jitter(180, 60),
     lines: [{ t: (c) => {
       if (c.includes('root') && c.includes('passwd')) return 'root:x:0:0:root:/root:/bin/bash';
       if (c.includes('kali') && c.includes('passwd')) return 'kali:x:1000:1000:Kali,,,:/home/kali:/bin/bash';
@@ -899,6 +907,7 @@ const HANDLERS = [
   // ── curl / wget ───────────────────────────────────────────────────────────
   {
     match: c => /^curl\s/.test(c),
+    loadTime: () => jitter(900, 300),
     lines: [{ t: (c) => {
       if (c.includes('10.10.10.10') || c.includes('dc01')) return '<!DOCTYPE html>\n<html><head><title>IIS Windows Server</title></head><body><h1>IIS</h1></body></html>';
       return 'curl: (6) Could not resolve host: ' + c.split(' ').pop();
@@ -906,6 +915,7 @@ const HANDLERS = [
   },
   {
     match: c => /^wget\s/.test(c),
+    loadTime: () => jitter(1400, 400),
     lines: [
       { t: (c) => `--2024-01-15 14:23:01--  ${c.split(' ').pop()}` },
       { t: 'Connecting to... connected.' },
@@ -919,6 +929,7 @@ const HANDLERS = [
   // ── ssh ───────────────────────────────────────────────────────────────────
   {
     match: c => /^ssh\s/.test(c),
+    loadTime: () => jitter(2200, 600),
     lines: [
       { t: (c) => {
         const host = c.split(' ').pop();
@@ -930,6 +941,7 @@ const HANDLERS = [
   // ── nc / netcat ───────────────────────────────────────────────────────────
   {
     match: c => /^(nc|netcat)\s/.test(c),
+    loadTime: () => jitter(1500, 400),
     lines: [{ t: '(simulation — nc not interactive)', cls: 'd' }],
   },
 
@@ -942,6 +954,7 @@ const HANDLERS = [
   // ── service / systemctl ───────────────────────────────────────────────────
   {
     match: c => /^(service|systemctl)\s/.test(c),
+    loadTime: () => jitter(500, 150),
     lines: [{ t: (c) => {
       if (c.includes('status')) return '● ssh.service - OpenBSD Secure Shell server\n   Loaded: loaded (/lib/systemd/system/ssh.service)\n   Active: active (running) since Mon 2024-01-15 12:10:03 EST; 2h 13min ago\n Main PID: 591 (sshd)\n   CGroup: /system.slice/ssh.service\n           └─591 sshd: /usr/sbin/sshd -D';
       if (c.includes('start') || c.includes('restart')) return '';
@@ -1226,6 +1239,7 @@ const HANDLERS = [
   // ── lsblk ─────────────────────────────────────────────────────────────────
   {
     match: c => /^lsblk(\s|$)/.test(c),
+    loadTime: () => jitter(250, 70),
     lines: [
       { t: 'NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS' },
       { t: 'sda           8:0    0    50G  0 disk ', cls: 'b' },
@@ -1238,6 +1252,7 @@ const HANDLERS = [
   // ── lspci ─────────────────────────────────────────────────────────────────
   {
     match: c => /^lspci(\s|$)/.test(c),
+    loadTime: () => jitter(350, 80),
     lines: [
       { t: '00:00.0 Host bridge: Intel Corporation 440BX/ZX/DX - 82443BX/ZX/DX Host bridge (rev 01)' },
       { t: '00:01.0 PCI bridge: Intel Corporation 440BX/ZX/DX - 82443BX/ZX/DX AGP bridge (rev 01)' },
@@ -1259,6 +1274,7 @@ const HANDLERS = [
   // ── lsusb ─────────────────────────────────────────────────────────────────
   {
     match: c => /^lsusb(\s|$)/.test(c),
+    loadTime: () => jitter(300, 80),
     lines: [
       { t: 'Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub', cls: 'b' },
       { t: 'Bus 001 Device 002: ID 0e0f:0003 VMware, Inc. Virtual Mouse' },
@@ -1271,6 +1287,7 @@ const HANDLERS = [
   // ── hostnamectl ───────────────────────────────────────────────────────────
   {
     match: c => /^hostnamectl(\s|$)/.test(c),
+    loadTime: () => jitter(300, 80),
     lines: [
       { t: '   Static hostname: kali', cls: 'b' },
       { t: '         Icon name: computer-vm' },
@@ -1293,6 +1310,7 @@ const HANDLERS = [
   // ── timedatectl ───────────────────────────────────────────────────────────
   {
     match: c => /^timedatectl(\s|$)/.test(c),
+    loadTime: () => jitter(280, 70),
     lines: [{ t: () => {
       const now = new Date();
       const utc = now.toUTCString().replace('GMT', 'UTC');
@@ -1312,6 +1330,7 @@ const HANDLERS = [
   {
     match: c => /^dmidecode(\s|$)/.test(c),
     requireRoot: true,
+    loadTime: () => jitter(500, 120),
     lines: [
       { t: '# dmidecode 3.5', cls: 'd' },
       { t: 'Getting SMBIOS data from sysfs.' },
@@ -1368,6 +1387,7 @@ const HANDLERS = [
   // ── vmstat ────────────────────────────────────────────────────────────────
   {
     match: c => /^vmstat(\s|$)/.test(c),
+    loadTime: () => jitter(300, 80),
     lines: [
       { t: 'procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----', cls: 'b' },
       { t: ' r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st' },
@@ -1378,6 +1398,7 @@ const HANDLERS = [
   // ── iostat ────────────────────────────────────────────────────────────────
   {
     match: c => /^iostat(\s|$)/.test(c),
+    loadTime: () => jitter(350, 90),
     lines: [
       { t: () => `Linux 6.6.9-amd64 (kali) \t${new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})} \t_x86_64_\t(4 CPU)` },
       { t: '' },
@@ -1392,6 +1413,7 @@ const HANDLERS = [
   // ── sysctl ────────────────────────────────────────────────────────────────
   {
     match: c => /^sysctl(\s|$)/.test(c),
+    loadTime: () => jitter(200, 60),
     lines: [{ t: (cmd) => {
       if (cmd.includes('net.ipv4.ip_forward')) return 'net.ipv4.ip_forward = 1';
       if (cmd.includes('kernel.hostname'))     return 'kernel.hostname = kali';
@@ -1418,6 +1440,7 @@ const HANDLERS = [
   // ── lsmod ─────────────────────────────────────────────────────────────────
   {
     match: c => c === 'lsmod',
+    loadTime: () => jitter(200, 60),
     lines: [
       { t: 'Module                  Size  Used by', cls: 'b' },
       { t: 'nf_nat                 57344  3 nft_nat,xt_nat,nf_nat_masquerade_ipv4' },
@@ -1441,6 +1464,7 @@ const HANDLERS = [
   // ── dmesg ────────────────────────────────────────────────────────────────
   {
     match: c => /^dmesg(\s|$)/.test(c),
+    loadTime: () => jitter(400, 100),
     lines: [
       { t: '[    0.000000] Linux version 6.6.9-amd64 (debian-kernel@lists.debian.org) (gcc-13 (Debian 13.2.0-13) 13.2.0, GNU ld (GNU Binutils for Debian) 2.41) #1 SMP PREEMPT_DYNAMIC Kali 6.6.9-1kali1 (2024-01-08)', cls: 'b' },
       { t: '[    0.000000] Command line: BOOT_IMAGE=/vmlinuz-6.6.9-amd64 root=/dev/sda1 ro quiet splash' },
@@ -1477,6 +1501,7 @@ const HANDLERS = [
   // ── journalctl ────────────────────────────────────────────────────────────
   {
     match: c => /^journalctl(\s|$)/.test(c),
+    loadTime: () => jitter(600, 150),
     lines: [
       { t: '-- Logs begin at Mon 2024-01-15 12:09:01 EST, end at Mon 2024-01-15 14:23:01 EST. --', cls: 'd' },
       { t: 'Jan 15 12:09:01 kali systemd[1]: Starting Kali GNU/Linux Rolling...', cls: 'b' },
@@ -1504,6 +1529,7 @@ const HANDLERS = [
   // ── ss — improved with -tulpn support ────────────────────────────────────
   {
     match: c => /^ss\s.*(-t|-u|-l|-p|-n|tulpn|antp)/.test(c) || /^netstat\s.*(-t|-u|-l|-p|-n|tulpn)/.test(c),
+    loadTime: () => jitter(300, 80),
     lines: [
       { t: 'Netid  State    Recv-Q  Send-Q  Local Address:Port     Peer Address:Port  Process', cls: 'b' },
       { t: 'tcp    LISTEN   0       128     0.0.0.0:22              0.0.0.0:*          users:(("sshd",pid=591,fd=3))', cls: 'g' },
@@ -1520,6 +1546,7 @@ const HANDLERS = [
   {
     match: c => /^iptables(\s|$)/.test(c),
     requireRoot: true,
+    loadTime: () => jitter(400, 100),
     lines: [
       { t: 'Chain INPUT (policy ACCEPT)', cls: 'g' },
       { t: 'target     prot opt source               destination' },
@@ -1536,6 +1563,7 @@ const HANDLERS = [
   {
     match: c => /^nft(\s|$)/.test(c),
     requireRoot: true,
+    loadTime: () => jitter(350, 90),
     lines: [
       { t: 'table inet filter {', cls: 'b' },
       { t: '\tchain input {' },
@@ -1620,6 +1648,7 @@ const HANDLERS = [
   // ── dpkg ─────────────────────────────────────────────────────────────────
   {
     match: c => /^dpkg(\s|$)/.test(c) || /^apt\s+list/.test(c),
+    loadTime: () => jitter(800, 200),
     lines: [{ t: (cmd) => {
       const pkgs = [
         ['adduser',            '3.134',                    'all',   'add and remove users and groups'],
@@ -1718,6 +1747,7 @@ const HANDLERS = [
   // ── wc ────────────────────────────────────────────────────────────────────
   {
     match: c => /^wc(\s|$)/.test(c),
+    loadTime: (cmd) => cmd && cmd.includes('rockyou') ? jitter(600, 150) : jitter(120, 40),
     lines: [{ t: (cmd) => {
       const arg = cmd.replace(/^wc\s*/, '').trim();
       if (arg.includes('rockyou')) return '14344392  14344392 139921507 /usr/share/wordlists/rockyou.txt';
@@ -1776,6 +1806,7 @@ const HANDLERS = [
   // ── md5sum / sha1sum / sha256sum / sha512sum ──────────────────────────────
   {
     match: c => /^(md5sum|sha1sum|sha256sum|sha512sum)\s/.test(c),
+    loadTime: (cmd) => cmd && cmd.includes('rockyou') ? jitter(2200, 400) : jitter(350, 100),
     lines: [{ t: (cmd) => {
       const tool = cmd.split(' ')[0];
       const arg  = cmd.replace(/^\S+\s+/, '').trim();
@@ -1833,6 +1864,7 @@ const HANDLERS = [
   // ── strings ───────────────────────────────────────────────────────────────
   {
     match: c => /^strings(\s|$)/.test(c),
+    loadTime: () => jitter(300, 80),
     lines: [{ t: (cmd) => {
       const arg = cmd.replace(/^strings\s*/, '').trim();
       const name = arg.split('/').pop();
@@ -1855,6 +1887,7 @@ const HANDLERS = [
   // ── openssl ───────────────────────────────────────────────────────────────
   {
     match: c => /^openssl(\s|$)/.test(c),
+    loadTime: (cmd) => cmd && cmd.includes('s_client') ? jitter(1200, 300) : cmd && (cmd.includes('genrsa') || cmd.includes('genpkey')) ? jitter(800, 200) : jitter(150, 50),
     lines: [{ t: (cmd) => {
       if (cmd.includes('version')) return 'OpenSSL 3.1.5 30 Jan 2024 (Library: OpenSSL 3.1.5 30 Jan 2024)';
       if (cmd.includes('rand')) {
@@ -1875,6 +1908,7 @@ const HANDLERS = [
   // ── gpg ───────────────────────────────────────────────────────────────────
   {
     match: c => /^gpg(\s|$)/.test(c),
+    loadTime: (cmd) => cmd && (cmd.includes('--encrypt') || cmd.includes('-e') || cmd.includes('--decrypt') || cmd.includes('-d')) ? jitter(600, 150) : jitter(150, 50),
     lines: [{ t: (cmd) => {
       if (cmd.includes('--version')) return 'gpg (GnuPG) 2.4.3\nlibgcrypt 1.10.2\nCopyright (C) 2023 g10 Code GmbH\nLicense GNU GPL-3.0-or-later <https://gnu.org/licenses/gpl.html>';
       if (cmd.includes('--list-keys') || cmd.includes('-k')) return `/home/${SIM.user}/.gnupg/pubring.kbx\n-----------------------------------\npub   rsa4096 2024-01-10 [SC]\n      A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0\nuid           [ultimate] Kali User <kali@kali.local>\nsub   rsa4096 2024-01-10 [E]`;
@@ -2465,6 +2499,15 @@ function runCommand(rawInput) {
   }
 
   if (cmd === 'clear') return { clear: true };
+  if (cmd === 'reset') {
+    SIM.cwd = '/home/kali';
+    SIM.user = 'kali';
+    SIM.windowsShell = false;
+    SIM.hashesOnDisk = false;
+    SIM.lootExfiltrated = false;
+    if (typeof CTF !== 'undefined') CTF._reset?.();
+    return { clear: true };
+  }
   if (cmd === 'exit' || cmd === 'logout') return { lines: [{ t: 'Type exit in your browser to close the tab.', cls: 'd' }] };
 
   // Walk handlers in order, first match wins
@@ -2482,8 +2525,9 @@ function runCommand(rawInput) {
         t: typeof l.t === 'function' ? l.t(cmd) : l.t,
         cls: typeof l.cls === 'function' ? l.cls(cmd) : (l.cls || ''),
       }));
-      const loadTime = typeof h.loadTime === 'function' ? h.loadTime() : (h.loadTime || 0);
-      return { id: h.id || null, lines, event, loadTime, progressFn: h.progressFn || null };
+      const loadTime = typeof h.loadTime === 'function' ? h.loadTime(cmd) : (h.loadTime || 0);
+      return { id: h.id || null, lines, event, loadTime, progressFn: h.progressFn || null,
+               liveDisplay: h.liveDisplay || false, displayFn: h.displayFn || null, refreshMs: h.refreshMs || 2000 };
     }
   }
 

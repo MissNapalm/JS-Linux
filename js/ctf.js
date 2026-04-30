@@ -160,16 +160,28 @@ const CTF = {
         </div>
         ${c.done
           ? `<div class="ctf-flag">${c.flag}</div>`
-          : `<div class="ctf-hint">${c.hint}</div>`}
+          : `<div class="ctf-hint-row"><span class="ctf-hint">${c.hint}</span><button class="ctf-copy-btn" data-cmd="${c.hint.replace(/"/g,'&quot;')}" title="Copy command"><i class="fa fa-copy"></i></button></div>`}
       </div>`
     ).join('');
 
     // Attach explain click handlers
     list.querySelectorAll('.ctf-item').forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', e => {
+        if (e.target.closest('.ctf-copy-btn')) return;
         const cid = parseInt(el.dataset.cid);
         const ch  = this.challenges.find(c => c.id === cid);
         if (ch) this._showExplain(ch);
+      });
+    });
+
+    // Attach copy handlers
+    list.querySelectorAll('.ctf-copy-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(btn.dataset.cmd).then(() => {
+          btn.innerHTML = '<i class="fa fa-check"></i>';
+          setTimeout(() => { btn.innerHTML = '<i class="fa fa-copy"></i>'; }, 1500);
+        });
       });
     });
   },
@@ -179,6 +191,13 @@ const CTF = {
     document.getElementById('ctf-explain-title').textContent = ch.title;
     document.getElementById('ctf-explain-text').textContent  = ch.explain;
     document.getElementById('ctf-explain-hint').textContent  = ch.hint;
+    const copyBtn = document.getElementById('ctf-explain-copy');
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(ch.hint).then(() => {
+        copyBtn.innerHTML = '<i class="fa fa-check"></i> Copied';
+        setTimeout(() => { copyBtn.innerHTML = '<i class="fa fa-copy"></i> Copy'; }, 1500);
+      });
+    };
     document.getElementById('ctf-explain-modal').classList.remove('hidden');
   },
 
