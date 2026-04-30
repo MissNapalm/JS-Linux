@@ -2,14 +2,15 @@
 
 // ── Simulation state ──────────────────────────────────────────────────────────
 const SIM = {
-  cwd: '/home/kali',
-  user: 'kali',          // 'kali' or 'root'
+  cwd: '/home/capy',
+  user: 'capy',          // 'kali' or 'root'
   windowsShell: false,
   winCwd: 'C:\\Windows\\system32',
   hashesOnDisk: false,
   lootExfiltrated: false,
+  dirs: new Set(),   // extra dirs created by mkdir
   files: {
-    '/home/kali/notes.txt': `# Notes - DO NOT SHARE
+    '/home/capy/notes.txt': `# Notes - DO NOT SHARE
 # Found on workstation WS01 during initial recon
 # ---
 john.doe:Password1!
@@ -19,10 +20,10 @@ john.doe:Password1!
 # ---
 john.doe:Password1!
 # TODO: rotate these after project ends`,
-    '/home/kali/.bash_history': `sudo nmap -sn 10.10.10.0/24\nsudo nmap -sV -sC 10.10.10.10\nenum4linux -a 10.10.10.10`,
-    '/etc/hosts': `127.0.0.1   localhost\n10.10.10.5  kali\n10.10.10.10 DC01.CORP.LOCAL`,
-    '/etc/passwd': `root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\nkali:x:1000:1000:Kali,,,:/home/kali:/bin/bash`,
-    '/etc/os-release': `PRETTY_NAME="Kali GNU/Linux Rolling"\nNAME="Kali GNU/Linux"\nID=kali\nID_LIKE=debian\nVERSION="2024.2"\nHOME_URL="https://www.kali.org/"`,
+    '/home/capy/.bash_history': `sudo nmap -sn 10.10.10.0/24\nsudo nmap -sV -sC 10.10.10.10\nenum4linux -a 10.10.10.10`,
+    '/etc/hosts': `127.0.0.1   localhost\n10.10.10.5  capy\n10.10.10.10 DC01.CORP.LOCAL`,
+    '/etc/passwd': `root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\nkali:x:1000:1000:Capy,,,:/home/capy:/bin/bash`,
+    '/etc/os-release': `PRETTY_NAME="Kali GNU/Linux Rolling"\nNAME="Kali GNU/Linux"\nID=capy\nID_LIKE=debian\nVERSION="2024.2"\nHOME_URL="https://www.kali.org/"`,
   },
 };
 
@@ -32,11 +33,11 @@ function jitter(base, spread) {
 }
 
 function simFiles() {
-  const home = SIM.user === 'root' ? '/root' : '/home/kali';
+  const home = SIM.user === 'root' ? '/root' : '/home/capy';
   const f = { ...SIM.files };
   if (SIM.hashesOnDisk) {
     f[home + '/hashes.kerberoast'] = KRB5_HASHES;
-    f['/home/kali/hashes.kerberoast'] = KRB5_HASHES;
+    f['/home/capy/hashes.kerberoast'] = KRB5_HASHES;
     f['/root/hashes.kerberoast'] = KRB5_HASHES;
   }
   return f;
@@ -143,15 +144,15 @@ const HANDLERS = [
     match: c => c === 'id',
     lines: [{ t: () => isRoot()
       ? 'uid=0(root) gid=0(root) groups=0(root)'
-      : 'uid=1000(kali) gid=1000(kali) groups=1000(kali),4(adm),20(dialout),24(cdrom),25(floppy),27(sudo),29(audio),30(dip),44(video),46(plugdev),109(netdev),119(wireshark),142(kaboxer)' }],
+      : 'uid=1000(capy) gid=1000(capy) groups=1000(capy),4(adm),20(dialout),24(cdrom),25(floppy),27(sudo),29(audio),30(dip),44(video),46(plugdev),109(netdev),119(wireshark),142(kaboxer)' }],
   },
   {
     match: c => c === 'hostname',
-    lines: [{ t: 'kali' }],
+    lines: [{ t: 'capy' }],
   },
   {
     match: c => c.startsWith('uname'),
-    lines: [{ t: 'Linux kali 6.6.9-amd64 #1 SMP PREEMPT_DYNAMIC Kali 6.6.9-1kali1 (2024-01-08) x86_64 GNU/Linux' }],
+    lines: [{ t: 'Linux capy 6.6.9-amd64 #1 SMP PREEMPT_DYNAMIC Capy 6.6.9-1kali1 (2024-01-08) x86_64 GNU/Linux' }],
   },
   {
     match: c => c === 'pwd',
@@ -170,7 +171,7 @@ const HANDLERS = [
     lines: [
       { t: 'SHELL=/bin/bash' },
       { t: () => `USER=${SIM.user}` },
-      { t: () => `HOME=${SIM.user === 'root' ? '/root' : '/home/kali'}` },
+      { t: () => `HOME=${SIM.user === 'root' ? '/root' : '/home/capy'}` },
       { t: 'TERM=xterm-256color' },
       { t: 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' },
       { t: 'LANG=en_US.UTF-8' },
@@ -182,7 +183,7 @@ const HANDLERS = [
       { t: '    1  sudo nmap -sn 10.10.10.0/24' },
       { t: '    2  sudo nmap -sV -sC 10.10.10.10' },
       { t: '    3  enum4linux -a 10.10.10.10' },
-      { t: '    4  cat /home/kali/notes.txt' },
+      { t: '    4  cat /home/capy/notes.txt' },
     ],
   },
 
@@ -192,7 +193,7 @@ const HANDLERS = [
     lines: [{ t: (cmd) => {
       const showHidden = cmd.includes('-a') || cmd.includes('-la') || cmd.includes('-al');
       const longFmt    = cmd.includes('-l') || cmd.includes('-la') || cmd.includes('-al');
-      const home = SIM.user === 'root' ? '/root' : '/home/kali';
+      const home = SIM.user === 'root' ? '/root' : '/home/capy';
       const cwd  = SIM.cwd;
 
       // dirs: set of names that are directories
@@ -201,7 +202,7 @@ const HANDLERS = [
       let dotDirs = [];
       let dotFiles = [];
 
-      if (cwd === '/home/kali') {
+      if (cwd === '/home/capy') {
         dirs  = new Set(['Desktop','Documents','Downloads','Music','Pictures','Public','Templates','Videos']);
         files = ['notes.txt'];
         if (SIM.hashesOnDisk) files.push('hashes.kerberoast');
@@ -225,10 +226,10 @@ const HANDLERS = [
       } else if (cwd === '/home') {
         dirs  = new Set(['kali']);
         files = [];
-      } else if (cwd === '/home/kali/Desktop' || cwd === '/home/kali/Documents' ||
-                 cwd === '/home/kali/Downloads' || cwd === '/home/kali/Music' ||
-                 cwd === '/home/kali/Pictures' || cwd === '/home/kali/Public' ||
-                 cwd === '/home/kali/Templates' || cwd === '/home/kali/Videos') {
+      } else if (cwd === '/home/capy/Desktop' || cwd === '/home/capy/Documents' ||
+                 cwd === '/home/capy/Downloads' || cwd === '/home/capy/Music' ||
+                 cwd === '/home/capy/Pictures' || cwd === '/home/capy/Public' ||
+                 cwd === '/home/capy/Templates' || cwd === '/home/capy/Videos') {
         dirs = new Set([]); files = [];
       } else if (cwd === '/tmp') {
         dirs  = new Set([]);
@@ -242,6 +243,20 @@ const HANDLERS = [
         files = [];
       } else {
         dirs = new Set([]); files = [];
+      }
+
+      // Merge in any dirs/files created at runtime (mkdir/touch)
+      const cwdSlash = cwd === '/' ? '/' : cwd + '/';
+      for (const d of SIM.dirs) {
+        if (d.startsWith(cwdSlash) && !d.slice(cwdSlash.length).includes('/')) {
+          dirs.add(d.slice(cwdSlash.length));
+        }
+      }
+      for (const f of Object.keys(SIM.files)) {
+        if (f.startsWith(cwdSlash) && !f.slice(cwdSlash.length).includes('/')) {
+          const name = f.slice(cwdSlash.length);
+          if (!files.includes(name)) files.push(name);
+        }
       }
 
       // Build display list
@@ -307,7 +322,7 @@ const HANDLERS = [
   {
     match: c => /^cd(\s|$)/.test(c),
     lines: [{ t: (cmd) => {
-      const home = SIM.user === 'root' ? '/root' : '/home/kali';
+      const home = SIM.user === 'root' ? '/root' : '/home/capy';
       let arg = cmd.replace(/^cd\s*/, '').trim() || home;
       if (arg === '~') arg = home;
       else if (arg.startsWith('~/')) arg = home + arg.slice(1);
@@ -325,7 +340,7 @@ const HANDLERS = [
       SIM.cwd = target;
       return '';
     }, cls: (cmd) => {
-      const home = SIM.user === 'root' ? '/root' : '/home/kali';
+      const home = SIM.user === 'root' ? '/root' : '/home/capy';
       let arg = cmd.replace(/^cd\s*/, '').trim() || home;
       if (arg === '~') arg = home;
       else if (arg.startsWith('~/')) arg = home + arg.slice(1);
@@ -340,10 +355,21 @@ const HANDLERS = [
     }}],
   },
 
-  // ── mkdir / touch / rm ────────────────────────────────────────────────────
+  // ── mkdir / touch / rm ──────────────────────────────────────────────────────────────────────────
   {
     match: c => /^(mkdir|touch|rm|cp|mv|chmod)\s/.test(c),
-    lines: [{ t: '' }],
+    lines: [{ t: c => {
+      const op = c.split(' ')[0];
+      const arg = c.replace(/^\S+\s+(-p\s+)?/, '').trim();
+      const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/, '/') + arg;
+      if (op === 'mkdir') { SIM.dirs.add(abs); return ''; }
+      if (op === 'touch') { if (!SIM.files[abs]) SIM.files[abs] = ''; return ''; }
+      if (op === 'rm') {
+        if (c.includes('-rf') && arg === '/') return "rm: it is dangerous to operate recursively on '/'";
+        delete SIM.files[abs]; SIM.dirs.delete(abs); return '';
+      }
+      return '';
+    }}],
   },
 
   // ── Network ───────────────────────────────────────────────────────────────
@@ -375,9 +401,28 @@ const HANDLERS = [
     ],
   },
 
-  // ── NMAP ─────────────────────────────────────────────────────────────────
+  // ── nmap self (localhost / 127.0.0.1 / 10.10.10.5) ───────────────────────────
   {
-    id: 'nmap-discovery',
+    id: 'nmap-self',
+    loadTime: () => jitter(4200, 800),
+    match: c => /^nmap\b/.test(c) && /(localhost|127\.0\.0\.1|10\.10\.10\.5)/.test(c) && !c.includes('10.10.10.10'),
+    lines: [
+      { t: () => 'Starting Nmap 7.94 ( https://nmap.org ) at ' + new Date().toUTCString().slice(0,16) },
+      { t: () => `Nmap scan report for capy (10.10.10.5)` },
+      { t: 'Host is up (0.000082s latency).' },
+      { t: 'Not shown: 65533 closed tcp ports (reset)' },
+      { t: 'PORT     STATE SERVICE  VERSION' },
+      { t: '22/tcp   open  ssh      OpenSSH 9.2p1 Debian 2+deb12u2 (protocol 2.0)', cls: 'g' },
+      { t: '80/tcp   open  http     Apache httpd 2.4.57 ((Debian))', cls: 'g' },
+      { t: '631/tcp  open  ipp      CUPS 2.4', cls: 'g' },
+      { t: '' },
+      { t: 'Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel' },
+      { t: '' },
+      { t: () => 'Nmap done: 1 IP address (1 host up) scanned in ' + (3.8 + Math.random()).toFixed(2) + ' seconds', cls: 'g' },
+    ],
+  },
+  {
+id: 'nmap-discovery',
     loadTime: () => jitter(2600, 500),
     progressFn: (elapsed, total) => {
       const pct = Math.min(99.9, elapsed / total * 100).toFixed(1);
@@ -689,26 +734,25 @@ const HANDLERS = [
   // ── psexec ────────────────────────────────────────────────────────────────
   {
     id: 'psexec',
-    loadTime: () => jitter(5000, 1200),
     match: c => /impacket-psexec|psexec\.py/.test(c) && c.includes('10.10.10.10'),
-    lines: [
-      { t: 'Impacket v0.11.0 - Copyright 2023 Fortra' },
-      { t: '' },
-      { t: '[*] Requesting shares on 10.10.10.10.....', cls: 'b' },
-      { t: '[*] Found writable share ADMIN$', cls: 'g' },
-      { t: '[*] Uploading file XGaHpFZv.exe', cls: 'b' },
-      { t: '[*] Opening SVCManager on 10.10.10.10.....', cls: 'b' },
-      { t: '[*] Creating service oUUL on 10.10.10.10.....', cls: 'b' },
-      { t: '[*] Starting service oUUL.....', cls: 'b' },
-      { t: '[!] Press help for extra shell commands', cls: 'y' },
-      { t: 'Microsoft Windows [Version 10.0.17763.4737]', cls: 'w' },
-      { t: '(c) 2018 Microsoft Corporation. All rights reserved.', cls: 'd' },
-      { t: '' },
-      { t: 'C:\\Windows\\system32> whoami', cls: 'p' },
-      { t: 'nt authority\\system', cls: 'g' },
-      { t: '' },
-      { t: 'C:\\Windows\\system32> ', cls: 'p' },
+    stepLines: [
+      { t: 'Impacket v0.11.0 - Copyright 2023 Fortra',                    delay: 0 },
+      { t: '',                                                             delay: 300 },
+      { t: '[*] Requesting shares on 10.10.10.10.....',   cls: 'b',       delay: jitter(1200, 300) },
+      { t: '[*] Found writable share ADMIN$',             cls: 'g',       delay: jitter(800, 200) },
+      { t: '[*] Uploading file XGaHpFZv.exe',             cls: 'b',       delay: jitter(1400, 400) },
+      { t: '[*] Opening SVCManager on 10.10.10.10.....',  cls: 'b',       delay: jitter(900, 200) },
+      { t: '[*] Creating service oUUL on 10.10.10.10.....',cls: 'b',      delay: jitter(600, 150) },
+      { t: '[*] Starting service oUUL.....',              cls: 'b',       delay: jitter(1100, 300) },
+      { t: '[!] Press help for extra shell commands',     cls: 'y',       delay: jitter(500, 100) },
+      { t: 'Microsoft Windows [Version 10.0.17763.4737]', cls: 'w',      delay: jitter(700, 150) },
+      { t: '(c) 2018 Microsoft Corporation. All rights reserved.', cls: 'd', delay: 100 },
+      { t: '',                                                             delay: 400 },
+      { t: 'C:\\Windows\\system32> whoami',               cls: 'p',       delay: jitter(600, 150) },
+      { t: 'nt authority\\system',                        cls: 'g',       delay: jitter(300, 80) },
+      { t: '',                                                             delay: 200 },
     ],
+    lines: [],
     after: () => { SIM.windowsShell = true; SIM.winCwd = 'C:\\Windows\\system32'; },
   },
 
@@ -840,11 +884,11 @@ const HANDLERS = [
   {
     match: c => c === '-l',
     lines: [
-      { t: 'Matching Defaults entries for kali on kali:' },
+      { t: 'Matching Defaults entries for capy on capy:' },
       { t: '    env_reset, mail_badpass,' },
       { t: '    secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' },
       { t: '' },
-      { t: 'User kali may run the following commands on kali:', cls: 'g' },
+      { t: 'User capy may run the following commands on capy:', cls: 'g' },
       { t: '    (ALL : ALL) ALL', cls: 'g' },
     ],
   },
@@ -882,9 +926,9 @@ const HANDLERS = [
     match: c => /^find\s/.test(c),
     loadTime: () => jitter(500, 150),
     lines: [{ t: (c) => {
-      if (c.includes('.kerberoast') || c.includes('hash')) return SIM.hashesOnDisk ? '/home/kali/hashes.kerberoast' : '';
+      if (c.includes('.kerberoast') || c.includes('hash')) return SIM.hashesOnDisk ? '/home/capy/hashes.kerberoast' : '';
       if (c.includes('wordlist') || c.includes('rockyou')) return '/usr/share/wordlists/rockyou.txt';
-      if (c.includes('txt')) return '/home/kali/notes.txt\n/etc/hosts\n/etc/os-release';
+      if (c.includes('txt')) return '/home/capy/notes.txt\n/etc/hosts\n/etc/os-release';
       return '';
     }}],
   },
@@ -895,7 +939,7 @@ const HANDLERS = [
     loadTime: () => jitter(180, 60),
     lines: [{ t: (c) => {
       if (c.includes('root') && c.includes('passwd')) return 'root:x:0:0:root:/root:/bin/bash';
-      if (c.includes('kali') && c.includes('passwd')) return 'kali:x:1000:1000:Kali,,,:/home/kali:/bin/bash';
+      if (c.includes('kali') && c.includes('passwd')) return 'kali:x:1000:1000:Capy,,,:/home/capy:/bin/bash';
       if (c.includes('svc') || c.includes('service')) return 'svc_backup:Backup2023!\nsvc_sql:SqlServer1!\nsvc_web:Welcome123';
       return '';
     }, cls: 'g'}],
@@ -1019,8 +1063,8 @@ const HANDLERS = [
         { t: `      3 root      20   0       0      0      0 I   0.0   0.0   0:00.00 [rcu_gp]` },
         { t: `    591 root      20   0   12312   7712   6448 S   0.0   0.1   0:00.08 sshd` },
         { t: `    623 root      20   0   11688   3560   3284 S   0.0   0.0   0:00.01 cron` },
-        { t: `    891 kali      20   0  231420  52400  38100 S   0.0   0.6   0:01.23 Xorg` },
-        { t: `   1189 kali      20   0  456748  78432  59200 S   0.0   0.9   0:02.11 xfce4-session` },
+        { t: `    891 capy      20   0  231420  52400  38100 S   0.0   0.6   0:01.23 Xorg` },
+        { t: `   1189 capy      20   0  456748  78432  59200 S   0.0   0.9   0:02.11 xfce4-session` },
         { t: `   1337 ${SIM.user.padEnd(9)} 20   0   14240   3864   3188 R   0.0   0.0   ${toT} \x1b[1;97mtop\x1b[0m` },
         { t: '' },
         { t: `\x1b[90mq or Ctrl+C to quit\x1b[0m` },
@@ -1181,21 +1225,27 @@ const HANDLERS = [
     ],
   },
 
-  // ── mkdir / touch / rm / cp / mv ─────────────────────────────────────────
+  // ── mkdir / touch / rm / cp / mv ─────────────────────────────────────────────────────────────────
   {
     match: c => /^(mkdir|touch|rm|cp|mv)\s/.test(c),
     lines: [{ t: c => {
       const op = c.split(' ')[0];
-      if (op === 'rm' && c.includes('-rf') && (c.includes('/') && c.split(' ').pop() === '/'))
-        return 'rm: it is dangerous to operate recursively on \'/\'';
-      return '';   // silent success
+      const arg = c.replace(/^\S+\s+(-p\s+)?/, '').trim();
+      const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/, '/') + arg;
+      if (op === 'mkdir') { SIM.dirs.add(abs); return ''; }
+      if (op === 'touch') { if (!SIM.files[abs]) SIM.files[abs] = ''; return ''; }
+      if (op === 'rm') {
+        if (c.includes('-rf') && arg === '/') return "rm: it is dangerous to operate recursively on '/'";
+        delete SIM.files[abs]; SIM.dirs.delete(abs); return '';
+      }
+      return '';
     }}],
   },
 
   // ── cat /proc entries ─────────────────────────────────────────────────────
   {
     match: c => c === 'cat /proc/version',
-    lines: [{ t: 'Linux version 6.6.9-amd64 (debian-kernel@lists.debian.org) (gcc-13 (Debian 13.2.0-13) 13.2.0, GNU ld (GNU Binutils for Debian) 2.41) #1 SMP PREEMPT_DYNAMIC Kali 6.6.9-1kali1 (2024-01-08)' }],
+    lines: [{ t: 'Linux version 6.6.9-amd64 (debian-kernel@lists.debian.org) (gcc-13 (Debian 13.2.0-13) 13.2.0, GNU ld (GNU Binutils for Debian) 2.41) #1 SMP PREEMPT_DYNAMIC Capy 6.6.9-1kali1 (2024-01-08)' }],
   },
   {
     match: c => c === 'cat /proc/cpuinfo' || c === 'cat /proc/cpuinfo | head -20',
@@ -1307,7 +1357,7 @@ const HANDLERS = [
     match: c => /^hostnamectl(\s|$)/.test(c),
     loadTime: () => jitter(300, 80),
     lines: [
-      { t: '   Static hostname: kali', cls: 'b' },
+      { t: '   Static hostname: capy', cls: 'b' },
       { t: '         Icon name: computer-vm' },
       { t: '           Chassis: vm 🖥' },
       { t: () => `        Machine ID: d4a8f2c1b3e5a7d9f1c3e5b7a9d1f3c5` },
@@ -1418,7 +1468,7 @@ const HANDLERS = [
     match: c => /^iostat(\s|$)/.test(c),
     loadTime: () => jitter(350, 90),
     lines: [
-      { t: () => `Linux 6.6.9-amd64 (kali) \t${new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})} \t_x86_64_\t(4 CPU)` },
+      { t: () => `Linux 6.6.9-amd64 (capy) \t${new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})} \t_x86_64_\t(4 CPU)` },
       { t: '' },
       { t: 'avg-cpu:  %user   %nice %system %iowait  %steal   %idle', cls: 'b' },
       { t: '           2.28    0.00    0.82    0.21    0.00   96.69' },
@@ -1434,12 +1484,12 @@ const HANDLERS = [
     loadTime: () => jitter(200, 60),
     lines: [{ t: (cmd) => {
       if (cmd.includes('net.ipv4.ip_forward')) return 'net.ipv4.ip_forward = 1';
-      if (cmd.includes('kernel.hostname'))     return 'kernel.hostname = kali';
+      if (cmd.includes('kernel.hostname'))     return 'kernel.hostname = capy';
       if (cmd.includes('-a') || cmd.includes('--all')) return [
         'abi.vsyscall32 = 1',
         'debug.exception-trace = 1',
         'fs.file-max = 9223372036854775807',
-        'kernel.hostname = kali',
+        'kernel.hostname = capy',
         'kernel.osrelease = 6.6.9-amd64',
         'kernel.ostype = Linux',
         'kernel.pid_max = 4194304',
@@ -1484,7 +1534,7 @@ const HANDLERS = [
     match: c => /^dmesg(\s|$)/.test(c),
     loadTime: () => jitter(400, 100),
     lines: [
-      { t: '[    0.000000] Linux version 6.6.9-amd64 (debian-kernel@lists.debian.org) (gcc-13 (Debian 13.2.0-13) 13.2.0, GNU ld (GNU Binutils for Debian) 2.41) #1 SMP PREEMPT_DYNAMIC Kali 6.6.9-1kali1 (2024-01-08)', cls: 'b' },
+      { t: '[    0.000000] Linux version 6.6.9-amd64 (debian-kernel@lists.debian.org) (gcc-13 (Debian 13.2.0-13) 13.2.0, GNU ld (GNU Binutils for Debian) 2.41) #1 SMP PREEMPT_DYNAMIC Capy 6.6.9-1kali1 (2024-01-08)', cls: 'b' },
       { t: '[    0.000000] Command line: BOOT_IMAGE=/vmlinuz-6.6.9-amd64 root=/dev/sda1 ro quiet splash' },
       { t: '[    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009efff] usable' },
       { t: '[    0.000000] BIOS-e820: [mem 0x000000000009f000-0x00000000000fffff] reserved' },
@@ -1522,24 +1572,24 @@ const HANDLERS = [
     loadTime: () => jitter(600, 150),
     lines: [
       { t: '-- Logs begin at Mon 2024-01-15 12:09:01 EST, end at Mon 2024-01-15 14:23:01 EST. --', cls: 'd' },
-      { t: 'Jan 15 12:09:01 kali systemd[1]: Starting Kali GNU/Linux Rolling...', cls: 'b' },
-      { t: 'Jan 15 12:09:02 kali kernel: Linux version 6.6.9-amd64' },
-      { t: 'Jan 15 12:09:02 kali kernel: Command line: BOOT_IMAGE=/vmlinuz-6.6.9-amd64 root=/dev/sda1 ro quiet splash' },
-      { t: 'Jan 15 12:09:03 kali systemd[1]: Starting Network Time Synchronization...' },
-      { t: 'Jan 15 12:09:04 kali systemd[1]: Started Network Time Synchronization.', cls: 'g' },
-      { t: 'Jan 15 12:09:05 kali systemd[1]: Starting Network Service...' },
-      { t: 'Jan 15 12:09:05 kali NetworkManager[432]: <info>  [1705313345.0000] NetworkManager (version 1.44.2) is starting' },
-      { t: 'Jan 15 12:09:06 kali NetworkManager[432]: <info>  [1705313346.0000] Read config: /etc/NetworkManager/NetworkManager.conf' },
-      { t: 'Jan 15 12:09:08 kali NetworkManager[432]: <info>  [1705313348.0000] device (eth0): state change: config -> ip-config (reason \'none\', sys-iface-state: \'managed\')' },
-      { t: 'Jan 15 12:09:10 kali dhclient[612]: DHCPREQUEST for 10.10.10.5 on eth0 to 255.255.255.255 port 67', cls: 'b' },
-      { t: 'Jan 15 12:09:10 kali dhclient[612]: DHCPACK of 10.10.10.5 from 10.10.10.1', cls: 'g' },
-      { t: 'Jan 15 12:09:12 kali sshd[591]: Server listening on 0.0.0.0 port 22.', cls: 'g' },
-      { t: 'Jan 15 12:09:12 kali sshd[591]: Server listening on :: port 22.' },
-      { t: 'Jan 15 12:10:03 kali gdm-launch-environment[811]: pam_unix(gdm-launch-environment:session): session opened for user gdm(uid=115) by (uid=0)' },
-      { t: 'Jan 15 12:10:15 kali sudo[1022]: pam_unix(sudo:auth): authentication failure; logname=kali uid=1000 euid=0 tty=/dev/pts/0 ruser=kali rhost=  user=kali', cls: 'y' },
-      { t: 'Jan 15 12:10:20 kali sudo[1023]:     kali : TTY=pts/0 ; PWD=/home/kali ; USER=root ; COMMAND=/usr/bin/nmap -sn 10.10.10.0/24', cls: 'b' },
-      { t: 'Jan 15 14:18:04 kali sudo[1289]:     kali : TTY=pts/0 ; PWD=/home/kali ; USER=root ; COMMAND=/usr/bin/nmap -sV -sC 10.10.10.10', cls: 'b' },
-      { t: 'Jan 15 14:22:31 kali sudo[1421]:     kali : TTY=pts/0 ; PWD=/home/kali ; USER=root ; COMMAND=/usr/sbin/john hashes.kerberoast --wordlist=/usr/share/wordlists/rockyou.txt', cls: 'b' },
+      { t: 'Jan 15 12:09:01 capy systemd[1]: Starting Kali GNU/Linux Rolling...', cls: 'b' },
+      { t: 'Jan 15 12:09:02 capy kernel: Linux version 6.6.9-amd64' },
+      { t: 'Jan 15 12:09:02 capy kernel: Command line: BOOT_IMAGE=/vmlinuz-6.6.9-amd64 root=/dev/sda1 ro quiet splash' },
+      { t: 'Jan 15 12:09:03 capy systemd[1]: Starting Network Time Synchronization...' },
+      { t: 'Jan 15 12:09:04 capy systemd[1]: Started Network Time Synchronization.', cls: 'g' },
+      { t: 'Jan 15 12:09:05 capy systemd[1]: Starting Network Service...' },
+      { t: 'Jan 15 12:09:05 capy NetworkManager[432]: <info>  [1705313345.0000] NetworkManager (version 1.44.2) is starting' },
+      { t: 'Jan 15 12:09:06 capy NetworkManager[432]: <info>  [1705313346.0000] Read config: /etc/NetworkManager/NetworkManager.conf' },
+      { t: 'Jan 15 12:09:08 capy NetworkManager[432]: <info>  [1705313348.0000] device (eth0): state change: config -> ip-config (reason \'none\', sys-iface-state: \'managed\')' },
+      { t: 'Jan 15 12:09:10 capy dhclient[612]: DHCPREQUEST for 10.10.10.5 on eth0 to 255.255.255.255 port 67', cls: 'b' },
+      { t: 'Jan 15 12:09:10 capy dhclient[612]: DHCPACK of 10.10.10.5 from 10.10.10.1', cls: 'g' },
+      { t: 'Jan 15 12:09:12 capy sshd[591]: Server listening on 0.0.0.0 port 22.', cls: 'g' },
+      { t: 'Jan 15 12:09:12 capy sshd[591]: Server listening on :: port 22.' },
+      { t: 'Jan 15 12:10:03 capy gdm-launch-environment[811]: pam_unix(gdm-launch-environment:session): session opened for user gdm(uid=115) by (uid=0)' },
+      { t: 'Jan 15 12:10:15 capy sudo[1022]: pam_unix(sudo:auth): authentication failure; logname=capy uid=1000 euid=0 tty=/dev/pts/0 ruser=capy rhost=  user=kali', cls: 'y' },
+      { t: 'Jan 15 12:10:20 capy sudo[1023]:     capy : TTY=pts/0 ; PWD=/home/capy ; USER=root ; COMMAND=/usr/bin/nmap -sn 10.10.10.0/24', cls: 'b' },
+      { t: 'Jan 15 14:18:04 capy sudo[1289]:     capy : TTY=pts/0 ; PWD=/home/capy ; USER=root ; COMMAND=/usr/bin/nmap -sV -sC 10.10.10.10', cls: 'b' },
+      { t: 'Jan 15 14:22:31 capy sudo[1421]:     capy : TTY=pts/0 ; PWD=/home/capy ; USER=root ; COMMAND=/usr/sbin/john hashes.kerberoast --wordlist=/usr/share/wordlists/rockyou.txt', cls: 'b' },
       { t: '-- No entries -- (use journalctl --no-pager for full output)', cls: 'd' },
     ],
   },
@@ -1704,7 +1754,7 @@ const HANDLERS = [
       if (cmd.includes('-s') || cmd.includes('--status')) {
         const pkg = cmd.split(' ').pop();
         const p = pkgs.find(x => x[0] === pkg) || [pkg, '0.0.0', 'amd64', 'Package not found'];
-        return `Package: ${p[0]}\nStatus: install ok installed\nPriority: optional\nSection: misc\nInstalled-Size: 4096\nMaintainer: Kali Developers <devel@kali.org>\nArchitecture: ${p[2]}\nVersion: ${p[1]}\nDescription: ${p[3]}`;
+        return `Package: ${p[0]}\nStatus: install ok installed\nPriority: optional\nSection: misc\nInstalled-Size: 4096\nMaintainer: Capy Developers <devel@kali.org>\nArchitecture: ${p[2]}\nVersion: ${p[1]}\nDescription: ${p[3]}`;
       }
       const hdr = 'Desired=Unknown/Install/Remove/Purge/Hold\n| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend\n|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)\n||/ Name                      Version                      Architecture Description\n+++-=========================-============================-============-====================================';
       return hdr + '\n' + pkgs.map(([n,v,a,d]) => `ii  ${n.padEnd(25)} ${v.padEnd(28)} ${a.padEnd(12)} ${d}`).join('\n');
@@ -1787,17 +1837,17 @@ const HANDLERS = [
       const nMatch = cmd.match(/-n\s*(\d+)/);
       const n = nMatch ? parseInt(nMatch[1]) : 10;
       const files = { ...SIM.files };
-      if (SIM.hashesOnDisk) files['/home/kali/hashes.kerberoast'] = KRB5_HASHES;
+      if (SIM.hashesOnDisk) files['/home/capy/hashes.kerberoast'] = KRB5_HASHES;
       const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/,'/') + arg;
-      const content = files[abs] || files['/home/kali/' + arg];
+      const content = files[abs] || files['/home/capy/' + arg];
       if (content) return content.split('\n').slice(0, n).join('\n');
       return `head: cannot open '${arg}' for reading: No such file or directory`;
     }, cls: (cmd) => {
       const arg = cmd.replace(/^head\s+(-n\s*\d+\s+)?/, '').trim();
       const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/,'/') + arg;
       const files = { ...SIM.files };
-      if (SIM.hashesOnDisk) files['/home/kali/hashes.kerberoast'] = KRB5_HASHES;
-      return (files[abs] || files['/home/kali/'+arg]) ? '' : 'r';
+      if (SIM.hashesOnDisk) files['/home/capy/hashes.kerberoast'] = KRB5_HASHES;
+      return (files[abs] || files['/home/capy/'+arg]) ? '' : 'r';
     }}],
   },
 
@@ -1809,9 +1859,9 @@ const HANDLERS = [
       const nMatch = cmd.match(/-n\s*(\d+)/);
       const n = nMatch ? parseInt(nMatch[1]) : 10;
       const files = { ...SIM.files };
-      if (SIM.hashesOnDisk) files['/home/kali/hashes.kerberoast'] = KRB5_HASHES;
+      if (SIM.hashesOnDisk) files['/home/capy/hashes.kerberoast'] = KRB5_HASHES;
       const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/,'/') + arg;
-      const content = files[abs] || files['/home/kali/' + arg];
+      const content = files[abs] || files['/home/capy/' + arg];
       if (content) {
         const lines = content.split('\n');
         if (cmd.includes('-f')) return lines.slice(-n).join('\n') + '\n(tail: following - press Ctrl+C to stop)';
@@ -1836,7 +1886,7 @@ const HANDLERS = [
       };
       const name = arg.split('/').pop();
       const h = hashes[tool]?.[name] || Array.from({length: tool === 'sha512sum' ? 128 : tool === 'sha256sum' ? 64 : tool === 'sha1sum' ? 40 : 32}, () => '0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
-      const exists = SIM.files['/home/kali/'+name] || SIM.files['/root/'+name] || name === 'hashes.kerberoast';
+      const exists = SIM.files['/home/capy/'+name] || SIM.files['/root/'+name] || name === 'hashes.kerberoast';
       if (!exists) return `${tool}: ${arg}: No such file or directory`;
       return `${h}  ${arg}`;
     }, cls: 'g'}],
@@ -1853,7 +1903,7 @@ const HANDLERS = [
       const arg = cmd.replace(/^base64\s*/, '').trim();
       if (!arg) return `base64: extra operand`;
       const name = arg.split('/').pop();
-      const content = SIM.files['/home/kali/'+name] || SIM.files[arg] || 'Hello World';
+      const content = SIM.files['/home/capy/'+name] || SIM.files[arg] || 'Hello World';
       return btoa(content).match(/.{1,76}/g).join('\n');
     }}],
   },
@@ -1864,7 +1914,7 @@ const HANDLERS = [
     lines: [{ t: (cmd) => {
       const arg = cmd.replace(/^xxd\s*/, '').trim();
       const name = arg.split('/').pop();
-      const raw = SIM.files['/home/kali/'+name] || SIM.files[arg] || '';
+      const raw = SIM.files['/home/capy/'+name] || SIM.files[arg] || '';
       if (!raw && arg) return `xxd: ${arg}: No such file or directory`;
       const src = raw || '# Notes - DO NOT SHARE\n';
       const bytes = src.slice(0, 128);
@@ -1886,7 +1936,7 @@ const HANDLERS = [
     lines: [{ t: (cmd) => {
       const arg = cmd.replace(/^strings\s*/, '').trim();
       const name = arg.split('/').pop();
-      const content = SIM.files['/home/kali/'+name] || SIM.files[arg];
+      const content = SIM.files['/home/capy/'+name] || SIM.files[arg];
       if (content) return content.split('\n').filter(l => l.trim()).join('\n');
       if (arg.startsWith('/usr/bin/') || arg.startsWith('/bin/')) return [
         '/lib64/ld-linux-x86-64.so.2',
@@ -1929,7 +1979,7 @@ const HANDLERS = [
     loadTime: (cmd) => cmd && (cmd.includes('--encrypt') || cmd.includes('-e') || cmd.includes('--decrypt') || cmd.includes('-d')) ? jitter(600, 150) : jitter(150, 50),
     lines: [{ t: (cmd) => {
       if (cmd.includes('--version')) return 'gpg (GnuPG) 2.4.3\nlibgcrypt 1.10.2\nCopyright (C) 2023 g10 Code GmbH\nLicense GNU GPL-3.0-or-later <https://gnu.org/licenses/gpl.html>';
-      if (cmd.includes('--list-keys') || cmd.includes('-k')) return `/home/${SIM.user}/.gnupg/pubring.kbx\n-----------------------------------\npub   rsa4096 2024-01-10 [SC]\n      A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0\nuid           [ultimate] Kali User <kali@kali.local>\nsub   rsa4096 2024-01-10 [E]`;
+      if (cmd.includes('--list-keys') || cmd.includes('-k')) return `/home/${SIM.user}/.gnupg/pubring.kbx\n-----------------------------------\npub   rsa4096 2024-01-10 [SC]\n      A1B2C3D4E5F6A7B8C9D0E1F2A3B4C5D6E7F8A9B0\nuid           [ultimate] Capy User <kali@kali.local>\nsub   rsa4096 2024-01-10 [E]`;
       if (cmd.includes('--encrypt') || cmd.includes('-e')) return 'gpg: ' + cmd.split(' ').pop() + '.gpg: encryption okay';
       if (cmd.includes('--decrypt') || cmd.includes('-d')) return 'gpg: AES256 encrypted data\ngpg: encrypted with 1 passphrase\n[decrypted content would appear here]';
       return 'gpg: no valid OpenPGP data found.';
@@ -1942,7 +1992,7 @@ const HANDLERS = [
     loadTime: () => jitter(400, 100),
     lines: [{ t: (cmd) => {
       if (cmd.includes('-l') || cmd.includes('--fingerprint')) {
-        return `2048 SHA256:abc123def456xyz789 kali@kali (RSA)\n4096 SHA256:xyz789abc123def456 kali@kali (RSA)`;
+        return `2048 SHA256:abc123def456xyz789 capy@capy (RSA)\n4096 SHA256:xyz789abc123def456 capy@capy (RSA)`;
       }
       const bits = cmd.match(/-b\s+(\d+)/)?.[1] || '4096';
       return [
@@ -1953,7 +2003,7 @@ const HANDLERS = [
         `Your identification has been saved in /home/${SIM.user}/.ssh/id_rsa`,
         `Your public key has been saved in /home/${SIM.user}/.ssh/id_rsa.pub`,
         `The key fingerprint is:`,
-        `SHA256:K1a2L3i4K5a6L7i8K9a0b1c2d3e4f5g6h7i8j9k0 ${SIM.user}@kali`,
+        `SHA256:K1a2L3i4K5a6L7i8K9a0b1c2d3e4f5g6h7i8j9k0 ${SIM.user}@capy`,
         `The key's randomart image is:`,
         `+---[RSA ${bits}]----+`,
         `|  .   .          |`,
@@ -2093,7 +2143,7 @@ const HANDLERS = [
       const arg = cmd.replace(/^\S+\s+(-\S+\s+)*/, '').trim();
       if (!arg) return '(reads from stdin — pipe or file required in simulation)';
       const name = arg.split('/').pop();
-      const content = SIM.files['/home/kali/'+name] || SIM.files[arg] || '';
+      const content = SIM.files['/home/capy/'+name] || SIM.files[arg] || '';
       if (!content) return `sort: cannot read: ${arg}: No such file or directory`;
       const lines = content.split('\n').filter(Boolean);
       if (cmd.startsWith('uniq')) return [...new Set(lines)].join('\n');
@@ -2110,7 +2160,7 @@ const HANDLERS = [
       const f = fMatch ? parseInt(fMatch[1]) - 1 : 0;
       const d = dMatch ? dMatch[1] : '\t';
       const arg = cmd.split(' ').pop();
-      const content = SIM.files['/home/kali/'+arg.split('/').pop()] || '';
+      const content = SIM.files['/home/capy/'+arg.split('/').pop()] || '';
       if (!content) return `cut: ${arg}: No such file or directory`;
       return content.split('\n').map(l => l.split(d)[f] || '').filter(Boolean).join('\n');
     }}],
@@ -2124,7 +2174,7 @@ const HANDLERS = [
         const fMatch = cmd.match(/\{print\s+\$(\d+)\}/);
         const f = fMatch ? parseInt(fMatch[1]) - 1 : 0;
         const fileArg = cmd.split(' ').pop();
-        const content = SIM.files['/home/kali/' + fileArg.split('/').pop()] || '';
+        const content = SIM.files['/home/capy/' + fileArg.split('/').pop()] || '';
         if (content) return content.split('\n').map(l => l.split(/\s+/)[f] || '').filter(Boolean).join('\n');
       }
       if (cmd.includes('NR')) return '5';
@@ -2139,7 +2189,7 @@ const HANDLERS = [
       const sMatch = cmd.match(/s\/([^\/]+)\/([^\/]*)\/g?/);
       if (!sMatch) return '(sed: expression not recognized)';
       const fileArg = cmd.split(' ').pop();
-      const content = SIM.files['/home/kali/' + fileArg.split('/').pop()] || '';
+      const content = SIM.files['/home/capy/' + fileArg.split('/').pop()] || '';
       if (!content) return `(reading stdin: pipe required in simulation)`;
       const re = new RegExp(sMatch[1], 'g');
       return content.replace(re, sMatch[2]);
@@ -2237,11 +2287,11 @@ const HANDLERS = [
     match: c => /^export(\s|$)/.test(c),
     lines: [{ t: (cmd) => {
       if (cmd === 'export') return [
-        'declare -x HOME="/home/kali"',
+        'declare -x HOME="/home/capy"',
         'declare -x LANG="en_US.UTF-8"',
         'declare -x LOGNAME="kali"',
         'declare -x PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"',
-        'declare -x PWD="/home/kali"',
+        'declare -x PWD="/home/capy"',
         'declare -x SHELL="/bin/bash"',
         'declare -x TERM="xterm-256color"',
         `declare -x USER="${SIM.user}"`,
@@ -2374,7 +2424,7 @@ const HANDLERS = [
       { t: 'STEP 1  sudo nmap -sn 10.10.10.0/24', cls: 'c' },
       { t: 'STEP 2  sudo nmap -sV -sC 10.10.10.10', cls: 'c' },
       { t: 'STEP 3  enum4linux -a 10.10.10.10', cls: 'c' },
-      { t: 'STEP 4  cat /home/kali/notes.txt', cls: 'c' },
+      { t: 'STEP 4  cat /home/capy/notes.txt', cls: 'c' },
       { t: '        crackmapexec smb 10.10.10.10 -u john.doe -p \'Password1!\'', cls: 'c' },
       { t: 'STEP 5  impacket-GetUserSPNs CORP.LOCAL/john.doe:\'Password1!\' -dc-ip 10.10.10.10', cls: 'c' },
       { t: 'STEP 6  impacket-GetUserSPNs CORP.LOCAL/john.doe:\'Password1!\' -dc-ip 10.10.10.10 -request -outputfile hashes.kerberoast', cls: 'c' },
@@ -2575,12 +2625,14 @@ function runCommand(rawInput) {
 
   if (cmd === 'clear') return { clear: true };
   if (cmd === 'reset') {
-    SIM.cwd = '/home/kali';
+    SIM.cwd = '/home/capy';
     SIM.user = 'kali';
     SIM.windowsShell = false;
     SIM.winCwd = 'C:\\Windows\\system32';
     SIM.hashesOnDisk = false;
     SIM.lootExfiltrated = false;
+    SIM.dirs = new Set();
+    SIM.files = Object.fromEntries(Object.entries(SIM.files).filter(([k]) => k.startsWith('/etc') || k.startsWith('/home/capy/.') || k === '/home/capy/notes.txt' || k === '/root/notes.txt'));
     if (typeof CTF !== 'undefined') CTF._reset?.();
     return { clear: true };
   }
@@ -2595,7 +2647,7 @@ function runCommand(rawInput) {
       if (h.requireRoot && !isRoot()) {
         return { lines: [{ t: `E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)\nE: Unable to acquire the dpkg frontend lock, are you root?\nHint: try  sudo ${cmd}`, cls: 'r' }] };
       }
-      if (h.after) h.after(cmd);
+      if (h.after && !h.stepLines) h.after(cmd);
       const event = typeof h.event === 'function' ? h.event(cmd) : h.event;
       const lines = h.lines.map(l => ({
         t: typeof l.t === 'function' ? l.t(cmd) : l.t,
@@ -2607,7 +2659,8 @@ function runCommand(rawInput) {
       }
       const loadTime = typeof h.loadTime === 'function' ? h.loadTime(cmd) : (h.loadTime || 0);
       return { id: h.id || null, lines, event, loadTime, progressFn: h.progressFn || null,
-               liveDisplay: h.liveDisplay || false, displayFn: h.displayFn || null, refreshMs: h.refreshMs || 2000 };
+               liveDisplay: h.liveDisplay || false, displayFn: h.displayFn || null, refreshMs: h.refreshMs || 2000,
+               stepLines: h.stepLines || null, after: h.stepLines ? h.after : null };
     }
   }
 

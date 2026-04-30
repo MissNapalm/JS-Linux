@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Kali Linux 2024.2 — Kerberoasting CTF Lab</title>
+  <title>CapyOS 2024.2 — Kerberoasting CTF Lab</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,8 +13,39 @@
 </head>
 <body class="w-full h-full overflow-hidden">
 
+<!-- ── Login / Register ───────────────────────────────────────────────────────────── -->
+<div id="auth-screen" class="fixed inset-0 flex items-center justify-center z-[999] bg-slate-100">
+  <div class="flex flex-col items-center gap-4 bg-white shadow-xl px-10 pt-6 pb-10" style="width:360px;border:1px solid #e2e8f0">
+
+    <img src="assets/icons/capy.png" alt="CapyOS" style="width:292px;height:199px;object-fit:fill;margin-bottom:-12px">
+
+    <div class="text-center -mt-1">
+      <div id="auth-title" class="text-lg font-bold text-slate-800" style="font-family:'Ubuntu',sans-serif">Sign In</div>
+    </div>
+
+    <div class="w-full flex flex-col gap-3">
+      <div id="auth-register-fields" class="hidden">
+        <input id="auth-username" type="text" placeholder="Username"
+          class="w-full px-4 py-2.5 text-sm font-sans outline-none border border-slate-200 bg-slate-50 text-slate-800 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition"
+          autocomplete="off" spellcheck="false" />
+      </div>
+      <input id="auth-password" type="password" placeholder="Password"
+        class="w-full px-4 py-2.5 text-sm font-sans outline-none border border-slate-200 bg-slate-50 text-slate-800 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 transition"
+        autocomplete="off" />
+    </div>
+
+    <div id="auth-error" class="hidden text-xs text-red-500 text-center -mt-2" style="font-family:'Ubuntu',sans-serif"></div>
+
+    <button id="auth-submit"
+      class="w-full py-2.5 text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 active:bg-violet-800 transition-colors shadow-sm"
+      style="font-family:'Ubuntu',sans-serif">
+      Sign In
+    </button>
+  </div>
+</div>
+
 <!-- ── Desktop ───────────────────────────────────────────────────────────── -->
-<div id="desktop" class="fixed inset-0">
+<div id="desktop" class="fixed inset-0" style="display:none">
 
   <!-- Wallpaper -->
   <div id="wallpaper" class="absolute inset-0 z-0" style="

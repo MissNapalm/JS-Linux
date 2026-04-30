@@ -1,7 +1,73 @@
 'use strict';
 (function() {
 
-  initDesktop();
+  // ── Auth ───────────────────────────────────────────────────────────────────────────
+  const authScreen  = document.getElementById('auth-screen');
+  const desktopEl   = document.getElementById('desktop');
+  const authTitle   = document.getElementById('auth-title');
+  const authSubmit  = document.getElementById('auth-submit');
+  const authError   = document.getElementById('auth-error');
+  const authPassEl  = document.getElementById('auth-password');
+  const authUserEl  = document.getElementById('auth-username');
+  const authRegFields = document.getElementById('auth-register-fields');
+
+  const storedUser = localStorage.getItem('hacklet_user');
+  const storedHash = localStorage.getItem('hacklet_pass');
+  const isFirstRun = !storedUser;
+
+  if (isFirstRun) {
+    authTitle.textContent = 'Create Account';
+    authSubmit.textContent = 'Create Account';
+    authRegFields.classList.remove('hidden');
+  }
+
+  function simpleHash(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+    return h.toString(16);
+  }
+
+  function showError(msg) {
+    authError.textContent = msg;
+    authError.classList.remove('hidden');
+  }
+
+  function doAuth() {
+    authError.classList.add('hidden');
+    const pass = authPassEl.value;
+    if (!pass) { showError('Password required'); return; }
+
+    if (isFirstRun) {
+      const user = authUserEl.value.trim();
+      if (!user) { showError('Username required'); return; }
+      localStorage.setItem('hacklet_user', user);
+      localStorage.setItem('hacklet_pass', simpleHash(pass));
+      SIM.user = user;
+      SIM.cwd  = '/home/' + user;
+      SIM.files['/home/' + user + '/notes.txt'] = SIM.files['/home/capy/notes.txt'] || '';
+    } else {
+      if (simpleHash(pass) !== storedHash) { showError('Incorrect password'); authPassEl.value = ''; return; }
+      SIM.user = storedUser;
+      SIM.cwd  = '/home/' + storedUser;
+    }
+
+    authScreen.style.opacity = '0';
+    authScreen.style.transition = 'opacity 0.3s';
+    setTimeout(() => {
+      authScreen.style.display = 'none';
+      desktopEl.style.display = '';
+      initDesktop();
+    }, 300);
+  }
+
+  authSubmit.addEventListener('click', doAuth);
+  authPassEl.addEventListener('keydown', e => { if (e.key === 'Enter') doAuth(); });
+  authUserEl.addEventListener('keydown', e => { if (e.key === 'Enter') authPassEl.focus(); });
+
+  // focus correct field on load
+  if (isFirstRun) authUserEl.focus(); else authPassEl.focus();
+
+  // hover effect handled by Tailwind classes
 
   // ── Desktop ─────────────────────────────────────────────────────────────────
   function initDesktop() {
@@ -84,7 +150,7 @@
     _termCount++;
     const label = _termCount === 1 ? '>_ Terminal' : `>_ Terminal ${_termCount}`;
 
-    const win = createWindow('Terminal — kali@kali', 720, 460, `
+    const win = createWindow('Terminal — capy@kali', 720, 460, `
       <div class="term-tabs-bar"></div>
       <div class="term-panes"></div>
     `);
@@ -176,7 +242,7 @@
 
   // ── Virtual filesystem for file manager ───────────────────────────────────
   function fmGetDir(path) {
-    const kh = '/home/kali';
+    const kh = '/home/capy';
     const hashes = SIM.hashesOnDisk ? [{ name: 'hashes.kerberoast', type: 'file' }] : [];
     const map = {
       '/': [
@@ -225,7 +291,7 @@
 
   function fmGetFileContent(path) {
     const extras = SIM.hashesOnDisk ? {
-      '/home/kali/hashes.kerberoast': KRB5_HASHES,
+      '/home/capy/hashes.kerberoast': KRB5_HASHES,
       '/root/hashes.kerberoast': KRB5_HASHES,
     } : {};
     const all = {
@@ -238,7 +304,7 @@
 
   // ── File manager window ───────────────────────────────────────────────────
   function openFileManagerWindow() {
-    const startPath = SIM.user === 'root' ? '/root' : '/home/kali';
+    const startPath = SIM.user === 'root' ? '/root' : '/home/capy';
 
     const win = createWindow('Files', 800, 520, `
       <div class="fm-window">
@@ -252,13 +318,13 @@
         <div class="fm-body">
           <nav class="fm-sidebar">
             <div class="fm-sidebar-label">Places</div>
-            <div class="fm-sidebar-item" data-path="/home/kali"><i class="fa fa-house"></i> Home</div>
-            <div class="fm-sidebar-item" data-path="/home/kali/Desktop"><i class="fa fa-display"></i> Desktop</div>
-            <div class="fm-sidebar-item" data-path="/home/kali/Documents"><i class="fa fa-folder"></i> Documents</div>
-            <div class="fm-sidebar-item" data-path="/home/kali/Downloads"><i class="fa fa-arrow-down"></i> Downloads</div>
-            <div class="fm-sidebar-item" data-path="/home/kali/Music"><i class="fa fa-music"></i> Music</div>
-            <div class="fm-sidebar-item" data-path="/home/kali/Pictures"><i class="fa fa-image"></i> Pictures</div>
-            <div class="fm-sidebar-item" data-path="/home/kali/Videos"><i class="fa fa-film"></i> Videos</div>
+            <div class="fm-sidebar-item" data-path="/home/capy"><i class="fa fa-house"></i> Home</div>
+            <div class="fm-sidebar-item" data-path="/home/capy/Desktop"><i class="fa fa-display"></i> Desktop</div>
+            <div class="fm-sidebar-item" data-path="/home/capy/Documents"><i class="fa fa-folder"></i> Documents</div>
+            <div class="fm-sidebar-item" data-path="/home/capy/Downloads"><i class="fa fa-arrow-down"></i> Downloads</div>
+            <div class="fm-sidebar-item" data-path="/home/capy/Music"><i class="fa fa-music"></i> Music</div>
+            <div class="fm-sidebar-item" data-path="/home/capy/Pictures"><i class="fa fa-image"></i> Pictures</div>
+            <div class="fm-sidebar-item" data-path="/home/capy/Videos"><i class="fa fa-film"></i> Videos</div>
             <div class="fm-sidebar-label">System</div>
             <div class="fm-sidebar-item" data-path="/"><i class="fa fa-server"></i> File System</div>
             <div class="fm-sidebar-item" data-path="/root"><i class="fa fa-user-shield"></i> Root</div>
@@ -390,7 +456,7 @@
         const map = {
           Desktop: '🖥', Documents: '📄', Downloads: '⬇️', Music: '🎵',
           Pictures: '🖼', Videos: '🎬', home: '🏠', root: '🔒',
-          kali: '👤', etc: '⚙️', tmp: '📂', usr: '📂', var: '📂',
+          capy: '👤', etc: '⚙️', tmp: '📂', usr: '📂', var: '📂',
           share: '📂', wordlists: '📋', log: '📋',
         };
         return `<span class="fm-icon-emoji">${map[item.name] || '📁'}</span>`;
@@ -418,7 +484,7 @@
       const parent = p.lastIndexOf('/') > 0 ? p.slice(0, p.lastIndexOf('/')) : '/';
       navigate(parent);
     });
-    homeBtn.addEventListener('click', () => navigate('/home/kali'));
+    homeBtn.addEventListener('click', () => navigate('/home/capy'));
     sidebar.querySelectorAll('.fm-sidebar-item').forEach(el => {
       el.addEventListener('click', () => navigate(el.dataset.path));
     });

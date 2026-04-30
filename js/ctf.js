@@ -130,7 +130,7 @@ const CTF = {
     SIM.windowsShell = false;
     SIM.lootExfiltrated = false;
     SIM.user = 'kali';
-    SIM.cwd  = '/home/kali';
+    SIM.cwd  = '/home/capy';
     TERM_INSTANCES.forEach(t => t._updatePrompt());
     this._renderSidebar();
   },

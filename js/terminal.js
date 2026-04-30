@@ -112,11 +112,6 @@ function createTerminal() {
 
     _printWelcome() {
       this._printLines([
-        { t: '┌──────────────────────────────────────────────────────────┐', cls: 'p' },
-        { t: '│  HackletOS 2024.2 — Kerberoasting CTF Lab                │', cls: 'p' },
-        { t: '│  Type  help  to see all attack steps                     │', cls: 'p' },
-        { t: '│  CTF Missions panel on the right tracks your progress    │', cls: 'p' },
-        { t: '└──────────────────────────────────────────────────────────┘', cls: 'p' },
         { t: '' },
       ]);
     },
@@ -128,12 +123,11 @@ function createTerminal() {
         return;
       }
       const user  = SIM.user;
-      const home  = user === 'root' ? '/root' : '/home/kali';
+      const home  = user === 'root' ? '/root' : '/home/capy';
       const cwd   = SIM.cwd === home ? '~' : SIM.cwd;
       const sigil = user === 'root' ? '#' : '$';
       this._xterm.writeln(
-        '\x1b[35m┌──(\x1b[0m\x1b[1;32m' + user + '\x1b[0m' +
-        '\x1b[35m㉿\x1b[0m\x1b[32mkali\x1b[0m' +
+        '\x1b[35m┌──(\x1b[0m\x1b[1;32m' + user + '@capy\x1b[0m' +
         '\x1b[35m)-[\x1b[0m\x1b[94m' + cwd + '\x1b[0m\x1b[35m]\x1b[0m'
       );
       this._xterm.write('\x1b[35m└─\x1b[0m\x1b[97m' + sigil + ' \x1b[0m');
@@ -305,16 +299,14 @@ function createTerminal() {
         filename,
         filepath: filepath || (filename.startsWith('/') ? filename : SIM.cwd.replace(/\/?$/, '/') + filename),
         lines: content.split('\n'),
-        cx: 0,       // cursor col in current line
-        cy: 0,       // cursor row in lines[]
-        scrollY: 0,  // first visible line index
+        cx: 0,
+        cy: 0,
+        _prefCx: 0,  // preferred column — preserved across up/down through short lines
+        scrollY: 0,
         dirty: false,
-        // search state
         searchStr: '',
-        // prompt state: null | 'save' | 'search' | 'exit'
         prompt: null,
         promptBuf: '',
-        // cut buffer
         cutBuf: [],
       };
       this._xterm.write('\x1b[?25l'); // hide cursor during draw
@@ -322,7 +314,7 @@ function createTerminal() {
       this._xterm.write('\x1b[?25h');
     },
 
-    _nanoRows() { return (this._xterm.rows || 24) - 3; }, // header + status + keybars
+    _nanoRows() { return (this._xterm.rows || 24) - 4; }, // header(1) + status(1) + keybars(2)
     _nanoCols() { return this._xterm.cols || 80; },
 
     _nanoRender() {
@@ -331,68 +323,60 @@ function createTerminal() {
       const rows = this._nanoRows();
       const t = this._xterm;
 
-      // Move to top-left, clear screen
-      t.write('\x1b[H\x1b[2J');
+      // Clear screen, home cursor
+      t.write('\x1b[2J');
 
-      // ── Header bar ──────────────────────────────────────────────────────
+      // row 1: header
       const ver = ' GNU nano 7.2 ';
       const fname = n.filename || 'New Buffer';
       const modified = n.dirty ? ' (modified)' : '';
       const title = fname + modified;
       const pad = Math.max(0, Math.floor((cols - ver.length - title.length) / 2));
-      const header = ver + ' '.repeat(pad) + title;
-      t.write('\x1b[7m' + header.padEnd(cols) + '\x1b[0m\r\n');
+      const header = (ver + ' '.repeat(pad) + title).padEnd(cols).slice(0, cols);
+      t.write('\x1b[1;1H\x1b[7m' + header + '\x1b[0m');
 
-      // ── Text area ───────────────────────────────────────────────────────
+      // rows 2..rows+1: text area
       for (let r = 0; r < rows; r++) {
         const lineIdx = n.scrollY + r;
-        t.write('\x1b[K'); // clear line
+        t.write(`\x1b[${r + 2};1H\x1b[K`);
         if (lineIdx < n.lines.length) {
-          const line = n.lines[lineIdx];
-          // Truncate to visible cols from horizontal scroll (basic, no horiz scroll for now)
-          t.write(line.slice(0, cols));
+          t.write(n.lines[lineIdx].slice(0, cols));
         }
-        if (r < rows - 1) t.write('\r\n');
       }
 
-      // ── Status bar ──────────────────────────────────────────────────────
-      t.write('\r\n');
+      // row rows+2: status bar
+      const statusRow = rows + 2;
+      t.write(`\x1b[${statusRow};1H\x1b[K`);
       if (n.prompt === 'save') {
-        const msg = `File Name to Write: ${n.promptBuf}`;
-        t.write('\x1b[7m' + msg.padEnd(cols) + '\x1b[0m');
+        t.write('\x1b[7m' + `File Name to Write: ${n.promptBuf}`.padEnd(cols).slice(0, cols) + '\x1b[0m');
       } else if (n.prompt === 'search') {
-        const msg = `Search: ${n.promptBuf}`;
-        t.write('\x1b[7m' + msg.padEnd(cols) + '\x1b[0m');
+        t.write('\x1b[7m' + `Search: ${n.promptBuf}`.padEnd(cols).slice(0, cols) + '\x1b[0m');
       } else if (n.prompt === 'exit') {
-        const msg = 'Save modified buffer? (Answering "No" will DISCARD changes.)  Y/N/?';
-        t.write('\x1b[7m' + msg.padEnd(cols) + '\x1b[0m');
+        t.write('\x1b[7m' + 'Save modified buffer? (Answering "No" will DISCARD changes.)  Y/N/?'.padEnd(cols).slice(0, cols) + '\x1b[0m');
       } else if (n._statusMsg) {
-        t.write('\x1b[7m' + n._statusMsg.padEnd(cols) + '\x1b[0m');
+        t.write('\x1b[7m' + n._statusMsg.padEnd(cols).slice(0, cols) + '\x1b[0m');
         n._statusMsg = '';
-      } else {
-        t.write('\x1b[K');
       }
 
-      // ── Keybinding bars ─────────────────────────────────────────────────
-      t.write('\r\n');
-      const keys = n.prompt
-        ? '\x1b[7m^G\x1b[0m Cancel      \x1b[7m^T\x1b[0m To Files    \x1b[7mM-D\x1b[0m DOS Format  \x1b[7mM-A\x1b[0m Append      \x1b[7mM-B\x1b[0m Backup File'
-        : '\x1b[7m^G\x1b[0m Help   \x1b[7m^O\x1b[0m Write Out  \x1b[7m^W\x1b[0m Where Is  \x1b[7m^K\x1b[0m Cut    \x1b[7m^T\x1b[0m Execute  \x1b[7m^C\x1b[0m Location\r\n\x1b[7m^X\x1b[0m Exit   \x1b[7m^R\x1b[0m Read File  \x1b[7m^\\\x1b[0m Replace   \x1b[7m^U\x1b[0m Paste  \x1b[7m^J\x1b[0m Justify  \x1b[7m^/\x1b[0m Go To Line';
-      t.write(keys);
-
-      // ── Reposition cursor ────────────────────────────────────────────────
+      // rows rows+3..rows+4: keybinding bars
+      const k1 = rows + 3, k2 = rows + 4;
       if (n.prompt) {
-        // cursor at end of prompt input on status bar line
-        const promptLabel = n.prompt === 'save' ? 'File Name to Write: '
-                          : n.prompt === 'search' ? 'Search: '
-                          : 'Save modified buffer? (Answering "No" will DISCARD changes.)  Y/N/?';
-        const promptRow = rows + 2; // 1-based: header(1) + rows + status(1)
-        const promptCol = n.prompt === 'exit' ? promptLabel.length + 1 : promptLabel.length + n.promptBuf.length + 1;
-        t.write(`\x1b[${promptRow};${Math.min(promptCol, cols)}H`);
+        t.write(`\x1b[${k1};1H\x1b[K\x1b[7m^G\x1b[0m Cancel      \x1b[7m^T\x1b[0m To Files    \x1b[7mM-D\x1b[0m DOS Format  \x1b[7mM-A\x1b[0m Append`);
+        t.write(`\x1b[${k2};1H\x1b[K`);
       } else {
-        const screenRow = n.cy - n.scrollY + 2; // +2 for header
-        const screenCol = n.cx + 1;
-        t.write(`\x1b[${screenRow};${screenCol}H`);
+        t.write(`\x1b[${k1};1H\x1b[K\x1b[7m^G\x1b[0m Help   \x1b[7m^O\x1b[0m Write Out  \x1b[7m^W\x1b[0m Where Is  \x1b[7m^K\x1b[0m Cut    \x1b[7m^T\x1b[0m Execute  \x1b[7m^C\x1b[0m Location`);
+        t.write(`\x1b[${k2};1H\x1b[K\x1b[7m^X\x1b[0m Exit   \x1b[7m^R\x1b[0m Read File  \x1b[7m^\\\x1b[0m Replace   \x1b[7m^U\x1b[0m Paste  \x1b[7m^J\x1b[0m Justify  \x1b[7m^/\x1b[0m Go To Line`);
+      }
+
+      // reposition cursor
+      if (n.prompt) {
+        const labelLen = n.prompt === 'save'   ? 'File Name to Write: '.length
+                       : n.prompt === 'search' ? 'Search: '.length
+                       : 'Save modified buffer? (Answering "No" will DISCARD changes.)  Y/N/?'.length;
+        const col = n.prompt === 'exit' ? labelLen + 1 : labelLen + n.promptBuf.length + 1;
+        t.write(`\x1b[${statusRow};${Math.min(col, cols)}H`);
+      } else {
+        t.write(`\x1b[${(n.cy - n.scrollY) + 2};${n.cx + 1}H`);
       }
     },
 
@@ -456,11 +440,11 @@ function createTerminal() {
 
       // ── Normal editing mode ──────────────────────────────────────────────
 
-      // Ctrl+X — exit
+      // Ctrl+X — exit (prompt if dirty)
       if (data === '\x18') {
         if (n.dirty) {
           n.prompt = 'exit';
-          n._exitAfterSave = false;
+          n._exitAfterSave = true;
           this._nanoRender();
         } else {
           this._nanoClose();
@@ -535,11 +519,19 @@ function createTerminal() {
 
       // Arrow keys
       if (data === '\x1b[A') { // up
-        if (n.cy > 0) { n.cy--; n.cx = Math.min(n.cx, n.lines[n.cy].length); }
+        if (n.cy > 0) {
+          n.cy--;
+          n._prefCx = Math.max(n._prefCx, n.cx);
+          n.cx = Math.min(n._prefCx, n.lines[n.cy].length);
+        }
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
       if (data === '\x1b[B') { // down
-        if (n.cy < n.lines.length - 1) { n.cy++; n.cx = Math.min(n.cx, n.lines[n.cy].length); }
+        if (n.cy < n.lines.length - 1) {
+          n.cy++;
+          n._prefCx = Math.max(n._prefCx, n.cx);
+          n.cx = Math.min(n._prefCx, n.lines[n.cy].length);
+        }
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
       if (data === '\x1b[C') { // right
@@ -548,6 +540,7 @@ function createTerminal() {
         } else if (n.cy < n.lines.length - 1) {
           n.cy++; n.cx = 0;
         }
+        n._prefCx = n.cx;
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
       if (data === '\x1b[D') { // left
@@ -556,28 +549,29 @@ function createTerminal() {
         } else if (n.cy > 0) {
           n.cy--; n.cx = n.lines[n.cy].length;
         }
+        n._prefCx = n.cx;
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
 
       // Home / Ctrl+A
       if (data === '\x1b[H' || data === '\x01') {
-        n.cx = 0; this._nanoRender(); return;
+        n.cx = 0; n._prefCx = 0; this._nanoRender(); return;
       }
       // End / Ctrl+E
       if (data === '\x1b[F' || data === '\x05') {
-        n.cx = n.lines[n.cy].length; this._nanoRender(); return;
+        n.cx = n.lines[n.cy].length; n._prefCx = n.cx; this._nanoRender(); return;
       }
 
       // PgUp / Ctrl+Y
       if (data === '\x1b[5~' || data === '\x19') {
         n.cy = Math.max(0, n.cy - rows);
-        n.cx = Math.min(n.cx, n.lines[n.cy].length);
+        n.cx = Math.min(n._prefCx, n.lines[n.cy].length);
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
       // PgDn / Ctrl+V
       if (data === '\x1b[6~' || data === '\x16') {
         n.cy = Math.min(n.lines.length - 1, n.cy + rows);
-        n.cx = Math.min(n.cx, n.lines[n.cy].length);
+        n.cx = Math.min(n._prefCx, n.lines[n.cy].length);
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
 
@@ -598,7 +592,7 @@ function createTerminal() {
         const after  = line.slice(n.cx);
         n.lines[n.cy] = before;
         n.lines.splice(n.cy + 1, 0, after);
-        n.cy++; n.cx = 0;
+        n.cy++; n.cx = 0; n._prefCx = 0;
         n.dirty = true;
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
@@ -615,6 +609,7 @@ function createTerminal() {
           n.lines.splice(n.cy, 1);
           n.cy--;
         }
+        n._prefCx = n.cx;
         n.dirty = true;
         this._nanoScrollIntoView(); this._nanoRender(); return;
       }
@@ -628,15 +623,16 @@ function createTerminal() {
           n.lines[n.cy] = line + n.lines[n.cy + 1];
           n.lines.splice(n.cy + 1, 1);
         }
+        n._prefCx = n.cx;
         n.dirty = true;
         this._nanoRender(); return;
       }
 
       // Tab
       if (data === '\t') {
-        const spaces = '  '; // 2-space tab like nano default
+        const spaces = '  ';
         n.lines[n.cy] = n.lines[n.cy].slice(0, n.cx) + spaces + n.lines[n.cy].slice(n.cx);
-        n.cx += spaces.length;
+        n.cx += spaces.length; n._prefCx = n.cx;
         n.dirty = true;
         this._nanoRender(); return;
       }
@@ -646,7 +642,7 @@ function createTerminal() {
         const printable = data.replace(/[\x00-\x1f\x7f]/g, '');
         if (!printable) return;
         n.lines[n.cy] = n.lines[n.cy].slice(0, n.cx) + printable + n.lines[n.cy].slice(n.cx);
-        n.cx += printable.length;
+        n.cx += printable.length; n._prefCx = n.cx;
         n.dirty = true;
         this._nanoRender();
       }
@@ -728,6 +724,19 @@ function createTerminal() {
         return;
       }
 
+      if (result.stepLines) {
+        this._busy = true;
+        await this._animateSteps(result.stepLines);
+        this._busy = false;
+        if (result.after) result.after();
+        this._writePrompt();
+        if (result.id) {
+          const captured = CTF.check(result);
+          if (captured) CTF._renderSidebar();
+        }
+        return;
+      }
+
       if (result.loadTime) {
         this._busy = true;
         const cancelled = await this._animateLoad(result.loadTime, result.progressFn);
@@ -750,7 +759,7 @@ function createTerminal() {
       if (!wasRoot) SIM.user = 'root';
       const result = runCommand(pendingCmd);
       const permanentRoot = /^(-i$|-s\s*$|su(\s|$))/.test(pendingCmd.trim());
-      if (!wasRoot && !permanentRoot) SIM.user = 'kali';
+      if (!wasRoot && !permanentRoot) SIM.user = 'capy';
       if (!result) { this._writePrompt(); return; }
       if (result.clear) { this._xterm.clear(); this._writePrompt(); return; }
 
@@ -769,6 +778,19 @@ function createTerminal() {
         return;
       }
 
+      if (result.stepLines) {
+        this._busy = true;
+        await this._animateSteps(result.stepLines);
+        this._busy = false;
+        if (result.after) result.after();
+        this._writePrompt();
+        if (result.id) {
+          const captured = CTF.check(result);
+          if (captured) CTF._renderSidebar();
+        }
+        return;
+      }
+
       if (result.loadTime) {
         this._busy = true;
         const cancelled = await this._animateLoad(result.loadTime, result.progressFn);
@@ -781,6 +803,23 @@ function createTerminal() {
         const captured = CTF.check(result);
         if (captured) CTF._renderSidebar();
       }
+    },
+
+    // ── Stepped output (per-line delays) ───────────────────────────────────────
+    _animateSteps(stepLines) {
+      return new Promise(resolve => {
+        let i = 0;
+        const next = () => {
+          if (i >= stepLines.length) { resolve(); return; }
+          const s = stepLines[i++];
+          setTimeout(() => {
+            if (s.t !== '') this._writeLine(s.t, s.cls);
+            else this._xterm.writeln('');
+            next();
+          }, s.delay ?? 0);
+        };
+        next();
+      });
     },
 
     // ── Live display (top/htop/watch) ───────────────────────────────────────
