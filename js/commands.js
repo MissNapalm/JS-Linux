@@ -1282,9 +1282,9 @@ const HANDLERS = [
     match: c => c === 'top' || /^top\s/.test(c),
     liveDisplay: true,
     loadTime: 120000,
-    refreshMs: 2000,
+    refreshMs: 500,
     displayFn: (tick) => {
-      const now = new Date(Date.now() + tick * 2000);
+      const now = new Date(Date.now() + tick * 500);
       const hms = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
       const upM = String(13 + Math.floor(tick * 2 / 60)).padStart(2, '0');
       const upS = String((tick * 2) % 60).padStart(2, '0');
@@ -1332,7 +1332,7 @@ const HANDLERS = [
     match: c => c === 'htop' || /^htop\s/.test(c),
     liveDisplay: true,
     loadTime: 120000,
-    refreshMs: 2000,
+    refreshMs: 500,
     displayFn: (tick) => {
       const r  = (v, d) => Math.max(0, v + (Math.random() * d * 2 - d));
       const cpuPct  = r(11.5, 3.0);

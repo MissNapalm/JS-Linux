@@ -123,7 +123,7 @@ function createTerminal() {
 
     // ── Colors ──────────────────────────────────────────────────────────────
     _clsColor(cls) {
-      return { p:'\x1b[35m', d:'\x1b[90m', g:'\x1b[32m', r:'\x1b[31m',
+      return { p:'\x1b[35m', d:'\x1b[37m', g:'\x1b[32m', r:'\x1b[31m',
                y:'\x1b[33m', c:'\x1b[36m', b:'\x1b[94m', h:'\x1b[97m', w:'\x1b[97m' }[cls] || '';
     },
 
