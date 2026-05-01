@@ -2874,9 +2874,24 @@ const HANDLERS = [
   {
     id: 'nmap-eb-vuln',
     loadTime: () => jitter(8000, 1500),
+    progressOnEnter: true,
+    progressFn: (elapsed, total) => {
+      const pct = Math.min(99.99, elapsed / total * 100).toFixed(2);
+      const elSec = Math.floor(elapsed / 1000);
+      const elM = Math.floor(elSec / 60), elS = elSec % 60;
+      const remMs = Math.max(0, total - elapsed);
+      const remSec = Math.floor(remMs / 1000);
+      const remM = Math.floor(remSec / 60), remS2 = remSec % 60;
+      const etc = new Date(Date.now() + remMs);
+      const etcStr = `${String(etc.getHours()).padStart(2,'0')}:${String(etc.getMinutes()).padStart(2,'0')}`;
+      return [
+        { t: `Stats: 0:${String(elM).padStart(2,'0')}:${String(elS).padStart(2,'0')} elapsed; 0 hosts completed (1 up), 1 undergoing Script Scan`, cls: 'd' },
+        { t: `NSE Timing: About ${pct}% done; ETC: ${etcStr} (0:${String(remM).padStart(2,'0')}:${String(remS2).padStart(2,'0')} remaining)`, cls: 'd' },
+      ];
+    },
     match: c => /^nmap\b/.test(c) && c.includes('smb-vuln') && c.includes('10.10.20.10'),
     lines: [
-      { t: 'Starting Nmap 7.94 ( https://nmap.org )' },
+      { t: () => 'Starting Nmap 7.94 ( https://nmap.org ) at ' + new Date().toUTCString().slice(0,16) },
       { t: 'Nmap scan report for WIN7-PC (10.10.20.10)' },
       { t: 'Host is up (0.0021s latency).' },
       { t: 'Not shown: 997 closed tcp ports (reset)' },
