@@ -146,6 +146,33 @@ function createTerminal() {
     _printWelcome() {},
 
     // ── Prompt ──────────────────────────────────────────────────────────────
+    _atomicClearAndPrompt() {
+      // Build the full prompt string and write everything atomically in one call
+      // so there is zero visible intermediate state between clear and prompt
+      const user  = this._user || SIM.user;
+      const home  = user === 'root' ? '/root' : '/home/' + user;
+      const cwd   = (this._cwd || SIM.cwd) === home ? '~' : (this._cwd || SIM.cwd);
+      const sigil = user === 'root' ? '#' : '$';
+      let prompt;
+      if (this._windowsShell) {
+        prompt = '\x1b[33m' + this._winCwd + '>\x1b[0m ';
+      } else if (SIM.msf) {
+        if (SIM.msfMeterWin) prompt = '\x1b[33mC:\\Windows\\system32>\x1b[0m ';
+        else if (SIM.msfMeter) prompt = '\x1b[1;31mmeterpreter\x1b[0m \x1b[31m>\x1b[0m ';
+        else if (SIM.msfModule) {
+          const short = SIM.msfModule.split('/').pop();
+          prompt = `\x1b[1;31mmsf6\x1b[0m \x1b[31mexploit\x1b[0m(\x1b[1;33m${short}\x1b[0m) \x1b[31m>\x1b[0m `;
+        } else prompt = '\x1b[1;31mmsf6\x1b[0m \x1b[31m>\x1b[0m ';
+      } else {
+        prompt =
+          '\x1b[35m\u250c\u2500\u2500(\x1b[0m\x1b[32m' + user + '@capy\x1b[0m' +
+          '\x1b[35m)-[\x1b[0m\x1b[94m' + cwd + '\x1b[0m\x1b[35m]\x1b[0m\r\n' +
+          '\x1b[35m\u2514\u2500\x1b[0m\x1b[97m' + sigil + ' \x1b[0m';
+      }
+      // Hide cursor, erase everything, home, write prompt, show cursor — one atomic write
+      this._xterm.write('\x1b[?25l\x1b[H\x1b[2J\x1b[3J\x1b[H' + prompt + '\x1b[?25h');
+    },
+
     _writePrompt() {
       if (this._windowsShell) {
         this._xterm.write('\x1b[33m' + this._winCwd + '>\x1b[0m ');
@@ -244,7 +271,7 @@ function createTerminal() {
         this._writePrompt(); return;
       }
       if (data === '\x0c') {
-        this._xterm.clear(); this._writePrompt(); return;
+        this._atomicClearAndPrompt(); return;
       }
       if (data === '\r') {
         const cmd = this._inputBuf;
@@ -855,7 +882,7 @@ function createTerminal() {
 
     _nanoClose() {
       this._nano = null;
-      this._xterm.write('\x1b[H\x1b[2J'); // clear screen
+      this._xterm.write('\x1b[H\x1b[2J\x1b[H'); // clear screen
       this._writePrompt();
     },
 
@@ -876,9 +903,7 @@ function createTerminal() {
       if (!result) { this._writePrompt(); return; }
 
       if (result.clear) {
-        this._xterm.clear();
-        if (raw.trim() === 'reset') this._printWelcome();
-        this._writePrompt();
+        this._atomicClearAndPrompt();
         return;
       }
 
@@ -919,6 +944,12 @@ function createTerminal() {
         this._history.forEach((cmd, i) => {
           this._writeLine(String(i + 1).padStart(5) + '  ' + cmd, '');
         });
+        this._writePrompt();
+        return;
+      }
+
+      if (result.lines && result.lines.length === 1 && result.lines[0].t && typeof result.lines[0].t === 'object' && result.lines[0].t.pingMode) {
+        await this._animatePing(result.lines[0].t.target);
         this._writePrompt();
         return;
       }
@@ -972,7 +1003,7 @@ function createTerminal() {
       if (!wasRoot && !permanentRoot) SIM.user = this._user || 'capy';
       this._simPull();
       if (!result) { this._writePrompt(); return; }
-      if (result.clear) { this._xterm.clear(); this._writePrompt(); return; }
+      if (result.clear) { this._atomicClearAndPrompt(); return; }
 
       if (result.openEditor) {
         this._nanoOpen(result.filename, result.content, result.filepath);
@@ -1033,6 +1064,38 @@ function createTerminal() {
       });
     },
 
+    // ── Ping (infinite append, Ctrl+C to stop) ────────────────────────────────
+    _animatePing(target) {
+      const times = [1.23, 0.98, 1.05, 1.44, 0.87, 1.12, 2.01, 0.93, 1.38, 0.76,
+                     1.55, 0.91, 1.22, 1.67, 0.84, 1.09, 1.31, 0.95, 1.48, 1.03];
+      let seq = 0;
+      this._writeLine(`PING ${target} 56(84) bytes of data.`);
+      return new Promise(resolve => {
+        const iv = setInterval(() => {
+          const t = times[seq % times.length];
+          this._writeLine(`64 bytes from ${target}: icmp_seq=${seq + 1} ttl=128 time=${t} ms`);
+          seq++;
+        }, 1000);
+        this._busy = true;
+        this._liveMode = true;
+        this._loadCancel = () => {
+          clearInterval(iv);
+          this._busy = false;
+          this._liveMode = false;
+          this._loadCancel = null;
+          this._xterm.writeln('\x1b[90m^C\x1b[0m');
+          this._writeLine(`--- ${target} ping statistics ---`);
+          const loss = 0;
+          this._writeLine(`${seq} packets transmitted, ${seq} received, ${loss}% packet loss`);
+          const avg = times.slice(0, Math.min(seq, times.length)).reduce((a,b)=>a+b,0) / Math.min(seq, times.length);
+          const min = Math.min(...times.slice(0, Math.min(seq, times.length)));
+          const max = Math.max(...times.slice(0, Math.min(seq, times.length)));
+          this._writeLine(`round-trip min/avg/max = ${min.toFixed(3)}/${avg.toFixed(3)}/${max.toFixed(3)} ms`);
+          resolve();
+        };
+      });
+    },
+
     // ── Live display (top/htop/watch) ───────────────────────────────────────
     _animateLive(displayFn, maxMs, refreshMs) {
       return new Promise(resolve => {
@@ -1084,10 +1147,7 @@ function createTerminal() {
       this._loadStart  = Date.now();
       this._loadTotal  = ms;
       return new Promise(resolve => {
-        const frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
-        let i = 0;
-        this._xterm.write(frames[0]);
-        const iv = setInterval(() => { this._xterm.write('\r' + frames[++i % frames.length]); }, 80);
+        let iv;
         const finish = (cancelled) => {
           clearInterval(iv);
           this._xterm.write('\r\x1b[K');
@@ -1095,6 +1155,27 @@ function createTerminal() {
           if (cancelled) this._xterm.writeln('\x1b[90m^C\x1b[0m');
           resolve(cancelled);
         };
+        if (progressFn) {
+          // No spinner — print rolling stats lines like real nmap/tools
+          let lastLineCount = 0;
+          iv = setInterval(() => {
+            const elapsed = Date.now() - this._loadStart;
+            const lines = progressFn(elapsed, ms);
+            if (lastLineCount > 0) this._xterm.write('\x1b[' + lastLineCount + 'A\x1b[J');
+            lastLineCount = lines.length;
+            for (const l of lines) {
+              const color = this._clsColor(l.cls);
+              if (color) this._xterm.writeln(color + l.t + '\x1b[0m');
+              else this._xterm.writeln(l.t);
+            }
+          }, 1000);
+        } else {
+          // Spinner for commands with no visible progress output
+          const frames = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+          let i = 0;
+          this._xterm.write(frames[0]);
+          iv = setInterval(() => { this._xterm.write('\r' + frames[++i % frames.length]); }, 80);
+        }
         this._loadCancel = () => finish(true);
         setTimeout(() => finish(false), ms);
       });

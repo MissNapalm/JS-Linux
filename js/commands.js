@@ -249,22 +249,40 @@ const HANDLERS = [
       } else if (cwd.startsWith('/home/') && cwd.split('/').length === 4 && !cwd.endsWith('/')) {
         // root visiting a subdir of another user's home
         const sub = cwd.split('/')[3];
+        if (sub === 'Desktop') { dirs = new Set([]); files = ['README.txt','lab_notes.txt','target_list.txt']; }
+        else if (sub === 'Documents') { dirs = new Set(['reports','tools','certs']); files = ['credentials.txt','network_notes.md','todo.txt']; }
+        else if (sub === 'Downloads') { dirs = new Set([]); files = ['linpeas.sh','winpeas.exe','mimikatz.zip','pspy64','chisel','socat']; }
+        else if (sub === 'Music') { dirs = new Set([]); files = ['playlist.m3u','lo-fi-hacking.mp3','synthwave_mix.mp3']; }
+        else if (sub === 'Pictures') { dirs = new Set(['screenshots','wallpapers']); files = ['network_diagram.png','corp_topology.png']; }
+        else if (sub === 'Templates') { dirs = new Set([]); files = ['pentest_report_template.md','bug_bounty_template.md']; }
+        else if (sub === 'Videos') { dirs = new Set([]); files = ['htb_walkthrough.mp4','tcm_course_notes.txt']; }
+        else if (['Public'].includes(sub)) { dirs = new Set([]); files = []; }
+        else if (sub === '.ssh') { dirs = new Set([]); files = ['known_hosts']; dotFiles = ['id_rsa','id_rsa.pub']; }
+        else if (sub === '.config') { dirs = new Set(['xfce4','gtk-3.0','pulse']); files = []; }
+        else if (sub === '.local') { dirs = new Set(['share','bin']); files = []; }
+        else if (sub === '.msf4') { dirs = new Set(['logs','loot','modules','plugins']); files = ['history']; }
       } else if (cwd === ('/home/' + SIM.user + '/Desktop')) {
-        dirs = new Set([]); files = ['README.txt'];
+        dirs = new Set([]); files = ['README.txt','lab_notes.txt','target_list.txt'];
       } else if (cwd === ('/home/' + SIM.user + '/Documents')) {
-        dirs = new Set(['reports','tools']); files = ['credentials.txt','network_notes.md'];
+        dirs = new Set(['reports','tools','certs']); files = ['credentials.txt','network_notes.md','todo.txt'];
       } else if (cwd.startsWith('/home/') && cwd.endsWith('/Downloads')) {
-        dirs = new Set([]); files = ['linpeas.sh','winpeas.exe','mimikatz.zip'];
-      } else if (cwd === ('/home/' + SIM.user + '/Music') ||
-                 cwd === ('/home/' + SIM.user + '/Pictures') ||
-                 cwd === ('/home/' + SIM.user + '/Public') ||
-                 cwd === ('/home/' + SIM.user + '/Templates') ||
-                 cwd === ('/home/' + SIM.user + '/Videos')) {
+        dirs = new Set([]); files = ['linpeas.sh','winpeas.exe','mimikatz.zip','pspy64','chisel','socat','ncat'];
+      } else if (cwd === ('/home/' + SIM.user + '/Music')) {
+        dirs = new Set([]); files = ['playlist.m3u','lo-fi-hacking.mp3','synthwave_mix.mp3'];
+      } else if (cwd === ('/home/' + SIM.user + '/Pictures')) {
+        dirs = new Set(['screenshots','wallpapers']); files = ['network_diagram.png','corp_topology.png'];
+      } else if (cwd === ('/home/' + SIM.user + '/Public')) {
         dirs = new Set([]); files = [];
+      } else if (cwd === ('/home/' + SIM.user + '/Templates')) {
+        dirs = new Set([]); files = ['pentest_report_template.md','bug_bounty_template.md'];
+      } else if (cwd === ('/home/' + SIM.user + '/Videos')) {
+        dirs = new Set([]); files = ['htb_walkthrough.mp4','tcm_course_notes.txt'];
       } else if (cwd === ('/home/' + SIM.user + '/Documents/reports')) {
-        dirs = new Set([]); files = ['pentest_report_draft.md','scope.txt'];
+        dirs = new Set([]); files = ['pentest_report_draft.md','scope.txt','findings_summary.xlsx','executive_summary.docx'];
       } else if (cwd === ('/home/' + SIM.user + '/Documents/tools')) {
-        dirs = new Set([]); files = ['nmap_cheatsheet.txt','ad_attack_notes.txt'];
+        dirs = new Set([]); files = ['nmap_cheatsheet.txt','ad_attack_notes.txt','rev_shell_oneliners.txt','payload_list.txt'];
+      } else if (cwd === ('/home/' + SIM.user + '/Documents/certs')) {
+        dirs = new Set([]); files = ['oscp_notes.md','ceh_study_guide.pdf','thm_progress.txt'];
       } else if (cwd === ('/home/' + SIM.user + '/.ssh')) {
         dirs = new Set([]); files = ['known_hosts']; dotFiles = ['id_rsa','id_rsa.pub'];
       } else if (cwd === ('/home/' + SIM.user + '/.config')) {
@@ -274,19 +292,19 @@ const HANDLERS = [
       } else if (cwd === ('/home/' + SIM.user + '/.msf4')) {
         dirs = new Set(['logs','loot','modules','plugins']); files = ['history'];
       } else if (cwd === '/root') {
-        dirs     = new Set(['Desktop','Documents','Downloads','.msf4']);
-        files    = ['notes.txt','root.txt'];
+        dirs     = new Set(['Desktop','Documents','Downloads','.msf4','.ssh']);
+        files    = ['notes.txt','root.txt','setup.sh'];
         if (SIM.hashesOnDisk) files.push('hashes.kerberoast');
-        dotDirs  = ['.config', '.ssh'];
+        dotDirs  = ['.config'];
         dotFiles = ['.bash_history', '.bashrc', '.profile'];
       } else if (cwd === '/root/Desktop') {
-        dirs = new Set([]); files = [];
+        dirs = new Set([]); files = ['flag.txt','credentials_dump.txt','network_map.png'];
       } else if (cwd === '/root/Documents') {
-        dirs = new Set([]); files = ['loot.txt'];
+        dirs = new Set(['engagements','tools']); files = ['loot.txt','master_credentials.txt','client_list.txt'];
       } else if (cwd === '/root/Downloads') {
-        dirs = new Set([]); files = ['linpeas.sh','chisel'];
+        dirs = new Set([]); files = ['linpeas.sh','chisel','pspy64','socat','nc','bloodhound.zip'];
       } else if (cwd === '/root/.ssh') {
-        dirs = new Set([]); files = ['known_hosts','authorized_keys'];
+        dirs = new Set([]); files = ['known_hosts','authorized_keys','id_rsa','id_rsa.pub'];
       } else if (cwd === '/') {
         dirs  = new Set(['bin','boot','dev','etc','home','lib','lib64','media','mnt','opt','proc','root','run','sbin','srv','sys','tmp','usr','var']);
         files = [];
@@ -308,8 +326,8 @@ const HANDLERS = [
         dirs  = new Set([registeredUser]);
         files = [];
       } else if (cwd === '/tmp') {
-        dirs  = new Set(['systemd-private-abc123','snap-private-tmp']);
-        files = ['sysinfo.txt'];
+        dirs  = new Set(['systemd-private-abc123','snap-private-tmp','vmware-root']);
+        files = ['sysinfo.txt','linpeas_output.txt','privesc_check.sh','exploit.py'];
         dotFiles = ['.font-unix', '.ICE-unix', '.X11-unix'];
       } else if (cwd === '/opt') {
         dirs = new Set(['metasploit-framework','impacket','crackmapexec','kerbrute','chisel']); files = [];
@@ -477,7 +495,12 @@ const HANDLERS = [
         '/home/' + SIM.user + '/.ssh', '/home/' + SIM.user + '/.config',
         '/home/' + SIM.user + '/.local', '/home/' + SIM.user + '/.msf4',
         '/home/' + SIM.user + '/Documents/reports', '/home/' + SIM.user + '/Documents/tools',
-        '/root', '/root/Desktop', '/root/Documents', '/root/Downloads', '/root/.ssh', '/root/.config', '/root/.msf4',
+        '/home/' + SIM.user + '/Documents/certs',
+        '/home/' + SIM.user + '/Music', '/home/' + SIM.user + '/Pictures',
+        '/home/' + SIM.user + '/Pictures/screenshots', '/home/' + SIM.user + '/Pictures/wallpapers',
+        '/home/' + SIM.user + '/Public', '/home/' + SIM.user + '/Templates', '/home/' + SIM.user + '/Videos',
+        '/root', '/root/Desktop', '/root/Documents', '/root/Documents/engagements', '/root/Documents/tools',
+        '/root/Downloads', '/root/.ssh', '/root/.config', '/root/.msf4',
       ]);
       // Also allow any path that exists in SIM.dirs or SIM.files
       const existsInSim = SIM.dirs.has(target) || Object.keys(simFiles()).some(f => f.startsWith(target + '/'));
@@ -587,16 +610,11 @@ const HANDLERS = [
     ],
   },
   {
-    match: c => c.startsWith('ping'),
-    lines: [
-      { t: (c) => `PING ${c.split(' ').pop()} 56(84) bytes of data.` },
-      { t: (c) => `64 bytes from ${c.split(' ').pop()}: icmp_seq=1 ttl=128 time=1.23 ms` },
-      { t: (c) => `64 bytes from ${c.split(' ').pop()}: icmp_seq=2 ttl=128 time=0.98 ms` },
-      { t: (c) => `64 bytes from ${c.split(' ').pop()}: icmp_seq=3 ttl=128 time=1.05 ms` },
-      { t: '^C' },
-      { t: (c) => `--- ${c.split(' ').pop()} ping statistics ---` },
-      { t: '3 packets transmitted, 3 received, 0% packet loss' },
-    ],
+    match: c => /^ping(\s|$)/.test(c),
+    lines: [{ t: (cmd) => {
+      const target = cmd.split(' ').filter(Boolean).pop();
+      return { pingMode: true, target };
+    }}],
   },
 
   // ── nmap self (localhost / 127.0.0.1 / 10.10.10.5) ───────────────────────────
