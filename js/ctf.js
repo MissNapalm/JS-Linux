@@ -323,7 +323,10 @@ const CTF = {
   },
 
   init() {
-    this._loadState();
+    // Always start fresh — reset progress on every new session
+    this.challenges.forEach(c => c.done = false);
+    localStorage.removeItem('ctf_state_kerberoast');
+    localStorage.removeItem('ctf_state_eternalblue');
     this._renderSidebar();
 
     document.getElementById('ctf-lab-select').addEventListener('change', e => {

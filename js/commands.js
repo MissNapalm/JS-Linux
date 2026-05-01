@@ -3602,7 +3602,7 @@ function runCommand(rawInput) {
       return { lines: [{ t: '' }] };
     }
     if (SIM.user === 'root') return { dropRoot: true };
-    return { lines: [{ t: 'logout', cls: 'd' }] };
+    return { lines: [{ t: 'There is no job to resume.', cls: 'd' }] };
   }
 
   // Walk handlers in order, first match wins
@@ -3636,7 +3636,7 @@ function runCommand(rawInput) {
       return { id: h.id || null, lines, event, loadTime, progressFn: h.progressFn || null,
                progressOnEnter: h.progressOnEnter || false,
                liveDisplay: h.liveDisplay || false, displayFn: h.displayFn || null, refreshMs: h.refreshMs || 2000,
-               stepLines: h.stepLines || null, after: h.stepLines ? h.after : null };
+               stepLines: h.stepLines ? h.stepLines.map(s => ({ ...s, t: typeof s.t === 'function' ? s.t(cmd) : s.t })) : null, after: h.stepLines ? h.after : null };
     }
   }
 

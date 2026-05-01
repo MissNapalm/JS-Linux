@@ -1086,7 +1086,7 @@ function createTerminal() {
           if (i >= stepLines.length) { resolve(); return; }
           const s = stepLines[i++];
           setTimeout(() => {
-            if (s.t !== '') this._writeLine(s.t, s.cls);
+            if (s.t !== '') this._writeLine(typeof s.t === 'function' ? s.t() : s.t, s.cls);
             else this._xterm.writeln('');
             next();
           }, s.delay ?? 0);
