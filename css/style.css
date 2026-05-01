@@ -324,41 +324,41 @@ button { cursor: pointer; font-family: inherit; }
 /* ── Mint-style app menu ──────────────────────────────────────────────────── */
 .am-cat {
   display: flex; align-items: center; gap: 9px;
-  padding: 7px 12px; font-size: 12px; color: #aaa;
+  padding: 7px 12px; font-size: 12px; color: #64748b;
   cursor: pointer; transition: background 0.1s, color 0.1s;
   font-family: 'Ubuntu', sans-serif; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis;
 }
-.am-cat:hover { background: #333; color: #ddd; }
-.am-cat.active { background: #3d6b3d; color: #fff; }
+.am-cat:hover { background: #f1f5f9; color: #334155; }
+.am-cat.active { background: #ede9fe; color: #6d28d9; font-weight: 500; }
 .am-cat-icon { width: 14px; text-align: center; flex-shrink: 0; font-size: 11px; }
 
 .am-app {
   display: flex; align-items: center; gap: 10px;
-  padding: 6px 12px; font-size: 12px; color: #ccc;
+  padding: 6px 12px; font-size: 12px; color: #475569;
   cursor: pointer; transition: background 0.1s, color 0.1s;
   font-family: 'Ubuntu', sans-serif;
 }
-.am-app:hover { background: #3a3a3a; color: #fff; }
+.am-app:hover { background: #f1f5f9; color: #1e293b; }
 .am-app-icon {
   width: 28px; height: 28px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; border-radius: 4px;
 }
 .am-app-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.am-app-name { font-size: 12px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.am-app-desc { font-size: 10px; color: #777; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.am-app-name { font-size: 12px; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.am-app-desc { font-size: 10px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 #app-menu-apps::-webkit-scrollbar,
 #app-menu-cats::-webkit-scrollbar { width: 4px; }
 #app-menu-apps::-webkit-scrollbar-thumb,
-#app-menu-cats::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+#app-menu-cats::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 2px; }
 
 .am-action-btn {
   width: 28px; height: 28px; border: none; background: transparent;
-  color: #888; font-size: 13px; border-radius: 4px;
+  color: #94a3b8; font-size: 13px; border-radius: 4px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: background 0.1s, color 0.1s;
 }
-.am-action-btn:hover { background: #3a3a3a; color: #ddd; }
-.am-action-btn-red:hover { background: rgba(239,68,68,0.2); color: #f87171; }
+.am-action-btn:hover { background: #f1f5f9; color: #475569; }
+.am-action-btn-red:hover { background: rgba(239,68,68,0.1); color: #ef4444; }

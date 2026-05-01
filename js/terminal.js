@@ -12,6 +12,7 @@ function createTerminal() {
     _liveMode: false,
     _loadCancel: null,
     _progressFn: null,
+    _onEnterProgress: null,
     _loadStart: 0,
     _loadTotal: 0,
     _sudoPendingCmd: null,
@@ -220,10 +221,14 @@ function createTerminal() {
       if (this._busy) {
         if (data === '\x03' || (this._liveMode && (data === 'q' || data === 'Q'))) {
           if (this._loadCancel) { this._loadCancel(); this._loadCancel = null; }
-        } else if (data === '\r' && this._progressFn) {
-          const elapsed = Date.now() - this._loadStart;
-          this._xterm.writeln('');
-          this._printLines(this._progressFn(elapsed, this._loadTotal));
+        } else if (data === '\r') {
+          if (this._onEnterProgress) {
+            this._onEnterProgress();
+          } else if (this._progressFn) {
+            const elapsed = Date.now() - this._loadStart;
+            this._xterm.writeln('');
+            this._printLines(this._progressFn(elapsed, this._loadTotal));
+          }
         }
         return;
       }
@@ -978,13 +983,23 @@ function createTerminal() {
       }
 
       if (result.loadTime) {
+        // For silent-progress commands (nmap), print the first line immediately before scanning
+        if (result.progressOnEnter && result.lines && result.lines.length > 0) {
+          const firstLine = result.lines[0];
+          const t = typeof firstLine.t === 'function' ? firstLine.t() : firstLine.t;
+          if (t) this._writeLine(t, firstLine.cls || '');
+          result._firstLinePrinted = true;
+        }
         this._busy = true;
-        const cancelled = await this._animateLoad(result.loadTime, result.progressFn);
+        const cancelled = await this._animateLoad(result.loadTime, result.progressFn, result.progressOnEnter);
         this._busy = false;
         if (cancelled) { this._writePrompt(); return; }
       }
 
-      if (result.lines) this._printLines(result.lines);
+      if (result.lines) {
+        const lines = result._firstLinePrinted ? result.lines.slice(1) : result.lines;
+        this._printLines(lines);
+      }
       this._writePrompt();
 
       if (result.id) {
@@ -1034,12 +1049,21 @@ function createTerminal() {
       }
 
       if (result.loadTime) {
+        if (result.progressOnEnter && result.lines && result.lines.length > 0) {
+          const firstLine = result.lines[0];
+          const t = typeof firstLine.t === 'function' ? firstLine.t() : firstLine.t;
+          if (t) this._writeLine(t, firstLine.cls || '');
+          result._firstLinePrinted = true;
+        }
         this._busy = true;
-        const cancelled = await this._animateLoad(result.loadTime, result.progressFn);
+        const cancelled = await this._animateLoad(result.loadTime, result.progressFn, result.progressOnEnter);
         this._busy = false;
         if (cancelled) { this._writePrompt(); return; }
       }
-      if (result.lines) this._printLines(result.lines);
+      if (result.lines) {
+        const lines = result._firstLinePrinted ? result.lines.slice(1) : result.lines;
+        this._printLines(lines);
+      }
       this._writePrompt();
       if (result.id) {
         const captured = CTF.check(result);
@@ -1142,7 +1166,7 @@ function createTerminal() {
       });
     },
 
-    _animateLoad(ms, progressFn) {
+    _animateLoad(ms, progressFn, progressOnEnter) {
       this._progressFn = progressFn || null;
       this._loadStart  = Date.now();
       this._loadTotal  = ms;
@@ -1150,13 +1174,25 @@ function createTerminal() {
         let iv;
         const finish = (cancelled) => {
           clearInterval(iv);
-          this._xterm.write('\r\x1b[K');
-          this._loadCancel = null; this._progressFn = null;
+          if (!progressFn) this._xterm.write('\r\x1b[K');
+          this._loadCancel = null; this._progressFn = null; this._onEnterProgress = null;
           if (cancelled) this._xterm.writeln('\x1b[90m^C\x1b[0m');
           resolve(cancelled);
         };
-        if (progressFn) {
-          // No spinner — print rolling stats lines like real nmap/tools
+        if (progressFn && progressOnEnter) {
+          // Silent — only print stats when Enter is pressed, appending lines (real nmap behaviour)
+          this._onEnterProgress = () => {
+            const elapsed = Date.now() - this._loadStart;
+            const lines = progressFn(elapsed, ms);
+            for (const l of lines) {
+              const color = this._clsColor(l.cls);
+              if (color) this._xterm.writeln(color + l.t + '\x1b[0m');
+              else this._xterm.writeln(l.t);
+            }
+          };
+          iv = setInterval(() => {}, 999999);
+        } else if (progressFn) {
+          // Continuous rolling stats for other tools
           let lastLineCount = 0;
           iv = setInterval(() => {
             const elapsed = Date.now() - this._loadStart;

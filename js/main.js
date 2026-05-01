@@ -155,6 +155,11 @@
     document.getElementById('welcome-close').addEventListener('click', closeWelcome);
     document.getElementById('welcome-close-dot').addEventListener('click', closeWelcome);
     welcomeModal.addEventListener('click', e => { if (e.target === welcomeModal) closeWelcome(); });
+    document.addEventListener('keydown', function onWelcomeEsc(e) {
+      if (e.key === 'Escape' && !welcomeModal.classList.contains('hidden')) {
+        closeWelcome();
+      }
+    });
 
     const appMenuBtn = document.getElementById('app-menu-btn');
     const appMenu    = document.getElementById('app-menu');
@@ -163,18 +168,18 @@
     const appMenuApps   = document.getElementById('app-menu-apps');
 
     const AM_APPS = [
-      { app:'terminal',   cat:'system',   icon:'fa fa-terminal',          iconBg:'#2a2a2a', iconColor:'#a78bfa', name:'Terminal',             desc:'Command line shell' },
-      { app:'files',      cat:'system',   icon:'fa fa-folder',             iconBg:'#2a2a2a', iconColor:'#fbbf24', name:'Files',                desc:'File manager' },
-      { app:'settings',   cat:'system',   icon:'fa fa-gear',               iconBg:'#2a2a2a', iconColor:'#94a3b8', name:'System Settings',      desc:'Configure your system' },
-      { app:'browser',    cat:'internet', icon:'fa-brands fa-firefox',     iconBg:'#2a2a2a', iconColor:'#fb923c', name:'Firefox ESR',          desc:'Web browser' },
-      { app:'burp',       cat:'security', icon:'fa fa-shield-halved',      iconBg:'#2a2a2a', iconColor:'#f97316', name:'Burp Suite Pro',       desc:'Web app security testing' },
-      { app:'wireshark',  cat:'security', icon:'fa fa-wave-square',        iconBg:'#2a2a2a', iconColor:'#60a5fa', name:'Wireshark',            desc:'Network traffic analyzer' },
-      { app:'metasploit', cat:'security', icon:'fa fa-skull',              iconBg:'#2a2a2a', iconColor:'#f87171', name:'Metasploit Framework', desc:'Exploitation framework' },
-      { app:'ghidra',     cat:'security', icon:'fa fa-magnifying-glass',   iconBg:'#2a2a2a', iconColor:'#4ade80', name:'Ghidra',               desc:'Reverse engineering suite' },
-      { app:'nmap',       cat:'security', icon:'fa fa-network-wired',      iconBg:'#2a2a2a', iconColor:'#a78bfa', name:'Zenmap',               desc:'Nmap GUI frontend' },
-      { app:'vscode',     cat:'dev',      icon:'fa fa-code',               iconBg:'#2a2a2a', iconColor:'#38bdf8', name:'VS Code',              desc:'Code editor' },
-      { app:'texteditor', cat:'dev',      icon:'fa fa-file-lines',         iconBg:'#2a2a2a', iconColor:'#94a3b8', name:'Text Editor',          desc:'Simple text editor' },
-      { app:'calculator', cat:'dev',      icon:'fa fa-calculator',         iconBg:'#2a2a2a', iconColor:'#34d399', name:'Calculator',           desc:'Desktop calculator' },
+      { app:'terminal',   cat:'system',   icon:'fa fa-terminal',          iconBg:'#f1f5f9', iconColor:'#a78bfa', name:'Terminal',             desc:'Command line shell' },
+      { app:'files',      cat:'system',   icon:'fa fa-folder',             iconBg:'#f1f5f9', iconColor:'#fbbf24', name:'Files',                desc:'File manager' },
+      { app:'settings',   cat:'system',   icon:'fa fa-gear',               iconBg:'#f1f5f9', iconColor:'#94a3b8', name:'System Settings',      desc:'Configure your system' },
+      { app:'browser',    cat:'internet', icon:'fa-brands fa-firefox',     iconBg:'#f1f5f9', iconColor:'#fb923c', name:'Firefox ESR',          desc:'Web browser' },
+      { app:'burp',       cat:'security', icon:'fa fa-shield-halved',      iconBg:'#f1f5f9', iconColor:'#f97316', name:'Burp Suite Pro',       desc:'Web app security testing' },
+      { app:'wireshark',  cat:'security', icon:'fa fa-wave-square',        iconBg:'#f1f5f9', iconColor:'#60a5fa', name:'Wireshark',            desc:'Network traffic analyzer' },
+      { app:'metasploit', cat:'security', icon:'fa fa-skull',              iconBg:'#f1f5f9', iconColor:'#f87171', name:'Metasploit Framework', desc:'Exploitation framework' },
+      { app:'ghidra',     cat:'security', icon:'fa fa-magnifying-glass',   iconBg:'#f1f5f9', iconColor:'#4ade80', name:'Ghidra',               desc:'Reverse engineering suite' },
+      { app:'nmap',       cat:'security', icon:'fa fa-network-wired',      iconBg:'#f1f5f9', iconColor:'#a78bfa', name:'Zenmap',               desc:'Nmap GUI frontend' },
+      { app:'vscode',     cat:'dev',      icon:'fa fa-code',               iconBg:'#f1f5f9', iconColor:'#38bdf8', name:'VS Code',              desc:'Code editor' },
+      { app:'texteditor', cat:'dev',      icon:'fa fa-file-lines',         iconBg:'#f1f5f9', iconColor:'#94a3b8', name:'Text Editor',          desc:'Simple text editor' },
+      { app:'calculator', cat:'dev',      icon:'fa fa-calculator',         iconBg:'#f1f5f9', iconColor:'#34d399', name:'Calculator',           desc:'Desktop calculator' },
     ];
 
     let amActiveCat = 'all';

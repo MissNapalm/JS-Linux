@@ -637,7 +637,7 @@ const HANDLERS = [
     ],
   },
   {
-id: 'nmap-discovery',
+    id: 'nmap-discovery',
     loadTime: () => jitter(2600, 500),
     progressFn: (elapsed, total) => {
       const pct = Math.min(99.9, elapsed / total * 100).toFixed(1);
@@ -648,6 +648,7 @@ id: 'nmap-discovery',
         { t: `Ping Scan Timing: About ${pct}% done; ETC: --:-- (0:${remS.padStart(2,'0')} remaining)`, cls: 'd' },
       ];
     },
+    progressOnEnter: true,
     match: c => /^nmap\b/.test(c) && (c.includes('/24') || c.includes('-sn')),
     lines: [
       { t: 'Starting Nmap 7.94 ( https://nmap.org ) at ' + new Date().toUTCString().slice(0,16) },
@@ -671,6 +672,7 @@ id: 'nmap-discovery',
   {
     id: 'nmap-legacy',
     loadTime: () => jitter(18000, 3000),
+    progressOnEnter: true,
     progressFn: (elapsed, total) => {
       const pct = Math.min(99.99, elapsed / total * 100).toFixed(2);
       const remMs = Math.max(0, total - elapsed);
@@ -714,6 +716,7 @@ id: 'nmap-discovery',
   {
     id: 'nmap-full',
     loadTime: () => jitter(28000, 5000),
+    progressOnEnter: true,
     progressFn: (elapsed, total) => {
       const elSec  = Math.floor(elapsed / 1000);
       const elMin  = Math.floor(elSec / 60);
@@ -3312,6 +3315,7 @@ function runCommand(rawInput) {
       }
       const loadTime = typeof h.loadTime === 'function' ? h.loadTime(cmd) : (h.loadTime || 0);
       return { id: h.id || null, lines, event, loadTime, progressFn: h.progressFn || null,
+               progressOnEnter: h.progressOnEnter || false,
                liveDisplay: h.liveDisplay || false, displayFn: h.displayFn || null, refreshMs: h.refreshMs || 2000,
                stepLines: h.stepLines || null, after: h.stepLines ? h.after : null };
     }
