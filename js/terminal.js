@@ -1180,15 +1180,16 @@ function createTerminal() {
           resolve(cancelled);
         };
         if (progressFn && progressOnEnter) {
-          // Silent — only print stats when Enter is pressed, appending lines (real nmap behaviour)
+          // Silent — only print stats when Enter is pressed, no blank lines between blocks
           this._onEnterProgress = () => {
             const elapsed = Date.now() - this._loadStart;
             const lines = progressFn(elapsed, ms);
-            for (const l of lines) {
+            lines.forEach((l, i) => {
               const color = this._clsColor(l.cls);
-              if (color) this._xterm.writeln(color + l.t + '\x1b[0m');
-              else this._xterm.writeln(l.t);
-            }
+              const text = color ? color + l.t + '\x1b[0m' : l.t;
+              // Use write+\r\n instead of writeln to avoid trailing blank line
+              this._xterm.write(text + '\r\n');
+            });
           };
           iv = setInterval(() => {}, 999999);
         } else if (progressFn) {

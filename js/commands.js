@@ -652,7 +652,6 @@ const HANDLERS = [
     match: c => /^nmap\b/.test(c) && (c.includes('/24') || c.includes('-sn')),
     lines: [
       { t: 'Starting Nmap 7.94 ( https://nmap.org ) at ' + new Date().toUTCString().slice(0,16) },
-      { t: '' },
       { t: 'Nmap scan report for 10.10.10.1', cls: 'b' },
       { t: 'Host is up (0.00080s latency).' },
       { t: '' },
