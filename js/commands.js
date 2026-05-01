@@ -1491,7 +1491,8 @@ const HANDLERS = [
       const procRows = procs.map(p => {
         const cs = p.cpu.toFixed(1).padStart(4);
         const cc = p.cpu > 5 ? `\x1b[33m${cs}\x1b[0m` : p.cpu > 1 ? `\x1b[32m${cs}\x1b[0m` : cs;
-        return { t: `${String(p.pid).padStart(7)} ${p.user.padEnd(9)} 20   0 ${String(p.virt).padStart(7)} ${String(p.res).padStart(6)} ${String(Math.floor(p.res*0.7)).padStart(6)} S ${cc}   ${p.mem.toFixed(1)}   ${p.time} ${p.cmd}` };
+        const row = `${String(p.pid).padStart(7)} ${p.user.slice(0,9).padEnd(9)} 20   0 ${String(p.virt).padStart(7)} ${String(p.res).padStart(6)} ${String(Math.floor(p.res*0.7)).padStart(6)} S ${cc}   ${p.mem.toFixed(1)}   ${p.time} ${p.cmd}`;
+        return { t: row };
       });
       return [
         { t: `top - ${hms} up  2:${upM}:${upS},  1 user,  load average: ${la1}, ${la5}, ${la15}` },
@@ -1500,8 +1501,8 @@ const HANDLERS = [
         { t: `\x1b[94mMiB Mem\x1b[0m :   8192.0 total,  ${String(memFree).padStart(7)} free,  \x1b[33m${String(memUsed).padStart(7)} used\x1b[0m,   ${(8192 - parseFloat(memFree) - parseFloat(memUsed)).toFixed(1)} buff/cache` },
         { t: `\x1b[94mMiB Swap\x1b[0m:   2048.0 total,   2048.0 free,      0.0 used.   ${(8192 - parseFloat(memUsed)).toFixed(1)} avail Mem` },
         { t: '' },
-        { t: `\x1b[7m    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND                              \x1b[0m` },
-        ...procRows,
+        { t: `\x1b[1;4m    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND\x1b[0m` },
+        ...procRows.map(r => ({ ...r, t: r.t.slice(0, 80) })),
         { t: '' },
         { t: `\x1b[90mq or Ctrl+C to quit\x1b[0m` },
       ];
