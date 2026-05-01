@@ -156,8 +156,11 @@
     document.getElementById('welcome-close-dot').addEventListener('click', closeWelcome);
     welcomeModal.addEventListener('click', e => { if (e.target === welcomeModal) closeWelcome(); });
     document.addEventListener('keydown', function onWelcomeEsc(e) {
-      if (e.key === 'Escape' && !welcomeModal.classList.contains('hidden')) {
-        closeWelcome();
+      if (!welcomeModal.classList.contains('hidden')) {
+        if (e.key === 'Escape' || e.key === 'Enter') {
+          e.preventDefault();
+          closeWelcome();
+        }
       }
     });
 
