@@ -461,7 +461,7 @@ function createTerminal() {
           'impacket-GetUserSPNs ','impacket-secretsdump ','impacket-psexec ',
           'msfconsole','john ','hashcat ','cat ','ls','pwd','help','whoami','cd ','reset',
           'nano ','vim ','find ','grep ','chmod ','mkdir ','touch ','rm ',
-          'lscpu','lsblk','lspci','lsusb','hostnamectl','timedatectl',
+          'neofetch','lscpu','lsblk','lspci','lsusb','hostnamectl','timedatectl',
           'dmidecode','vmstat','iostat','dmesg','journalctl',
           'ss -tulpn','netstat -tulpn','dig ','traceroute ',
           'dpkg -l','stat ','file ','xxd ','md5sum ','sha256sum ',

@@ -282,12 +282,19 @@ const CTF = {
     list.querySelectorAll('.ctf-copy-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        navigator.clipboard.writeText(btn.dataset.cmd).then(() => {
-          btn.innerHTML = '<i class="fa fa-check"></i>';
-          setTimeout(() => { btn.innerHTML = '<i class="fa fa-copy"></i>'; }, 1500);
-        });
+        const cmd = btn.dataset.cmd.split('\n')[0];
+        CTF._pasteToTerminal(cmd);
+        btn.innerHTML = '<i class="fa fa-check"></i>';
+        setTimeout(() => { btn.innerHTML = '<i class="fa fa-copy"></i>'; }, 1500);
       });
     });
+  },
+
+  _pasteToTerminal(cmd) {
+    const inst = TERM_INSTANCES.find(t => !t._busy && !t._nano) || TERM_INSTANCES[TERM_INSTANCES.length - 1];
+    if (!inst) return;
+    inst._setInput(cmd);
+    inst.focus();
   },
 
   _showExplain(ch) {
@@ -297,10 +304,9 @@ const CTF = {
     document.getElementById('ctf-explain-hint').textContent  = ch.hint;
     const copyBtn = document.getElementById('ctf-explain-copy');
     copyBtn.onclick = () => {
-      navigator.clipboard.writeText(ch.hint).then(() => {
-        copyBtn.innerHTML = '<i class="fa fa-check"></i> Copied';
-        setTimeout(() => { copyBtn.innerHTML = '<i class="fa fa-copy"></i> Copy'; }, 1500);
-      });
+      CTF._pasteToTerminal(ch.hint.split('\n')[0]);
+      copyBtn.innerHTML = '<i class="fa fa-check"></i> Pasted';
+      setTimeout(() => { copyBtn.innerHTML = '<i class="fa fa-copy"></i> Copy'; }, 1500);
     };
     document.getElementById('ctf-explain-modal').classList.remove('hidden');
   },

@@ -134,64 +134,55 @@
         <span class="font-mono text-base leading-none">☠</span>
         <span style="font-family:'Ubuntu',sans-serif">Applications</span>
       </button>
-      <!-- Popup menu -->
-      <div id="app-menu" class="hidden absolute bottom-12 left-0 rounded-xl py-1.5 min-w-[200px] z-[200]"
-        style="background:#fff;border:1px solid #e2e8f0;
-               box-shadow:0 -4px 24px rgba(0,0,0,0.12),0 0 0 1px rgba(0,0,0,0.04)">
-        <div class="app-menu-label px-4 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-widest" style="font-family:'Ubuntu',sans-serif">System</div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="terminal"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-terminal text-slate-500 w-4 text-xs"></i> Terminal
+
+      <!-- Mint-style two-panel menu -->
+      <div id="app-menu" class="hidden absolute bottom-12 left-0 z-[200]"
+        style="width:480px;background:#2d2d2d;border:1px solid #1a1a1a;
+               box-shadow:0 -4px 32px rgba(0,0,0,0.5);font-family:'Ubuntu',sans-serif">
+
+        <!-- Search bar -->
+        <div style="padding:10px 10px 8px;background:#252525;border-bottom:1px solid #1a1a1a">
+          <div style="display:flex;align-items:center;gap:8px;background:#1a1a1a;padding:6px 10px;border:1px solid #3a3a3a">
+            <i class="fa fa-magnifying-glass" style="color:#888;font-size:12px"></i>
+            <input id="app-menu-search" type="text" placeholder="Type to search..."
+              style="background:transparent;border:none;outline:none;color:#ddd;font-size:12px;width:100%;font-family:'Ubuntu',sans-serif"
+              spellcheck="false" autocomplete="off">
+          </div>
         </div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="files"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-folder text-yellow-400 w-4 text-xs"></i> Files
+
+        <!-- Two-panel body -->
+        <div style="display:flex;height:340px">
+
+          <!-- Left: categories -->
+          <div id="app-menu-cats" style="width:148px;flex-shrink:0;background:#252525;border-right:1px solid #1a1a1a;overflow-y:auto;padding:4px 0">
+            <div class="am-cat active" data-cat="all">
+              <i class="fa fa-border-all am-cat-icon"></i> All Applications
+            </div>
+            <div class="am-cat" data-cat="system">
+              <i class="fa fa-desktop am-cat-icon"></i> System
+            </div>
+            <div class="am-cat" data-cat="security">
+              <i class="fa fa-shield-halved am-cat-icon"></i> Security Tools
+            </div>
+            <div class="am-cat" data-cat="dev">
+              <i class="fa fa-code am-cat-icon"></i> Development
+            </div>
+            <div class="am-cat" data-cat="internet">
+              <i class="fa fa-globe am-cat-icon"></i> Internet
+            </div>
+          </div>
+
+          <!-- Right: apps -->
+          <div id="app-menu-apps" style="flex:1;overflow-y:auto;padding:4px 0">
+          </div>
         </div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="browser"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa-brands fa-firefox text-orange-400 w-4 text-xs"></i> Firefox ESR
-        </div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="settings"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-gear text-slate-400 w-4 text-xs"></i> Settings
-        </div>
-        <div class="h-px mx-3 my-1 bg-slate-100"></div>
-        <div class="app-menu-label px-4 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-widest" style="font-family:'Ubuntu',sans-serif">Security Tools</div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="burp"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-shield-halved text-orange-500 w-4 text-xs"></i> Burp Suite Pro
-        </div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="wireshark"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-wave-square text-blue-500 w-4 text-xs"></i> Wireshark
-        </div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="metasploit"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-skull text-red-500 w-4 text-xs"></i> Metasploit Framework
-        </div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="ghidra"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-magnifying-glass text-green-500 w-4 text-xs"></i> Ghidra
-        </div>
-        <div class="h-px mx-3 my-1 bg-slate-100"></div>
-        <div class="app-menu-label px-4 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-widest" style="font-family:'Ubuntu',sans-serif">Development</div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="vscode"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-code text-blue-400 w-4 text-xs"></i> VS Code
-        </div>
-        <div class="app-menu-item flex items-center gap-3 px-4 py-2 text-sm
-                    text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors" data-app="texteditor"
-             style="font-family:'Ubuntu',sans-serif">
-          <i class="fa fa-file-lines text-slate-400 w-4 text-xs"></i> Text Editor
+
+        <!-- Bottom strip -->
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:2px;padding:6px 8px;background:#1e1e1e;border-top:1px solid #1a1a1a">
+          <button class="am-action-btn" title="Lock Screen"><i class="fa fa-lock"></i></button>
+          <button class="am-action-btn" title="Log Out"><i class="fa fa-right-from-bracket"></i></button>
+          <button class="am-action-btn" title="Restart"><i class="fa fa-rotate-right"></i></button>
+          <button class="am-action-btn am-action-btn-red" title="Shut Down"><i class="fa fa-power-off"></i></button>
         </div>
       </div>
     </div>
@@ -236,6 +227,104 @@
              bg-violet-600 hover:bg-violet-700 transition-colors">
       Continue Hacking
     </button>
+  </div>
+</div>
+
+<!-- ── Welcome modal ────────────────────────────────────────────────────── -->
+<div id="welcome-modal" class="hidden fixed inset-0 flex items-center justify-center z-[600]"
+  style="background:rgba(0,0,0,0.5);backdrop-filter:blur(6px)">
+
+  <div class="window focused" style="width:580px;position:relative;pointer-events:all">
+
+    <!-- Titlebar -->
+    <div class="win-titlebar">
+      <span class="win-dot win-dot-red" id="welcome-close-dot"></span>
+      <span class="win-dot win-dot-yellow"></span>
+      <span class="win-dot win-dot-green"></span>
+      <span class="win-title">CapyOS — Welcome</span>
+    </div>
+
+    <!-- Carousel -->
+    <div class="win-body" style="background:#fff">
+      <div id="wc-slides" style="overflow:hidden;position:relative;height:320px">
+
+        <!-- Slide 1: What is this -->
+        <div class="wc-slide" style="padding:32px 36px 24px">
+          <div style="font-size:36px;margin-bottom:14px">💡</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:10px">What is CapyOS?</div>
+          <p style="font-size:13px;color:#475569;line-height:1.75">
+            CapyOS is a <strong style="color:#1e293b">browser-based Linux terminal simulator</strong> built entirely in JavaScript.
+            There's no real OS, no real network — everything is simulated, including the filesystem,
+            running processes, and network responses from target machines.
+          </p>
+          <p style="font-size:13px;color:#475569;line-height:1.75;margin-top:10px">
+            It's designed to let you practice real penetration testing workflows —
+            from recon all the way to domain compromise — without needing a lab environment.
+          </p>
+        </div>
+
+        <!-- Slide 2: How it works -->
+        <div class="wc-slide" style="padding:32px 36px 24px;display:none">
+          <div style="font-size:36px;margin-bottom:14px">⚙️</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">How it works</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="wc-fact"><span class="wc-pill">FS</span> The filesystem is a JavaScript object. Files you create with <code>touch</code> or <code>nano</code> persist for the session.</div>
+            <div class="wc-fact"><span class="wc-pill">CMD</span> Commands are matched against a handler list — each one returns realistic simulated output.</div>
+            <div class="wc-fact"><span class="wc-pill">NET</span> The simulated network has real targets: a domain controller at <code>10.10.10.10</code>, a legacy box, and more.</div>
+            <div class="wc-fact"><span class="wc-pill">UX</span> Tab completion, command history (↑↓), multi-tab terminals, and a file manager all work.</div>
+          </div>
+        </div>
+
+        <!-- Slide 3: The lab -->
+        <div class="wc-slide" style="padding:32px 36px 24px;display:none">
+          <div style="font-size:36px;margin-bottom:14px">🏆</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:10px">The CTF Lab</div>
+          <p style="font-size:13px;color:#475569;line-height:1.75">
+            The main lab walks you through a full <strong style="color:#1e293b">Kerberoasting attack chain</strong> —
+            network recon, SMB enumeration, SPN discovery, ticket cracking, and lateral movement to Domain Admin.
+          </p>
+          <p style="font-size:13px;color:#475569;line-height:1.75;margin-top:10px">
+            A second lab covers <strong style="color:#1e293b">EternalBlue / MS17-010</strong> via Metasploit.
+            More labs are on the way. Track your progress in the <strong style="color:#1e293b">CTF panel</strong> on the right,
+            or type <code style="color:#7c3aed">help</code> in the terminal for a step-by-step guide.
+          </p>
+        </div>
+
+        <!-- Slide 4: Tips -->
+        <div class="wc-slide" style="padding:32px 36px 24px;display:none">
+          <div style="font-size:36px;margin-bottom:14px">💡</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">Tips</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">TAB</span> Tab-complete commands and file paths just like a real shell.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">↑↓</span> Arrow keys cycle through command history.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">+</span> Click <strong style="color:#1e293b">+</strong> in the terminal tab bar to open a second shell.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">reset</span> Type <code>reset</code> to wipe the session and start fresh.</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Carousel controls -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px 20px;border-top:1px solid #f1f5f9">
+        <button id="wc-prev" style="width:32px;height:32px;border-radius:50%;border:1px solid #e2e8f0;background:#f8fafc;color:#94a3b8;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.1s" disabled>‹</button>
+        <div id="wc-dots" style="display:flex;gap:7px;align-items:center">
+          <span class="wc-dot active"></span>
+          <span class="wc-dot"></span>
+          <span class="wc-dot"></span>
+          <span class="wc-dot"></span>
+        </div>
+        <button id="wc-next" style="width:32px;height:32px;border-radius:50%;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;font-size:16px;display:flex;align-items:center;justify-content:center;transition:all 0.1s">›</button>
+      </div>
+
+      <!-- Footer button -->
+      <div style="padding:0 24px 20px">
+        <button id="welcome-close"
+          style="width:100%;padding:10px;background:#7c3aed;color:#fff;font-size:13px;font-weight:600;border:none;font-family:'Ubuntu',sans-serif;cursor:pointer;transition:background 0.15s"
+          onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">
+          Let’s go
+        </button>
+      </div>
+    </div>
   </div>
 </div>
 

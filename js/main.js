@@ -124,19 +124,123 @@
       document.getElementById('app-notice').classList.add('hidden');
     });
 
+    // Welcome modal — show once per session
+    const welcomeModal = document.getElementById('welcome-modal');
+    welcomeModal.classList.remove('hidden');
+
+    // Carousel
+    const slides = [...welcomeModal.querySelectorAll('.wc-slide')];
+    const dots   = [...welcomeModal.querySelectorAll('.wc-dot')];
+    const prevBtn = document.getElementById('wc-prev');
+    const nextBtn = document.getElementById('wc-next');
+    let current = 0;
+
+    function wcGoto(n) {
+      slides[current].style.display = 'none';
+      dots[current].classList.remove('active');
+      current = n;
+      slides[current].style.display = 'block';
+      dots[current].classList.add('active');
+      prevBtn.disabled = current === 0;
+      nextBtn.textContent = current === slides.length - 1 ? '✓' : '›';
+    }
+
+    prevBtn.addEventListener('click', () => { if (current > 0) wcGoto(current - 1); });
+    nextBtn.addEventListener('click', () => {
+      if (current < slides.length - 1) wcGoto(current + 1);
+      else closeWelcome();
+    });
+
+    function closeWelcome() { welcomeModal.classList.add('hidden'); }
+    document.getElementById('welcome-close').addEventListener('click', closeWelcome);
+    document.getElementById('welcome-close-dot').addEventListener('click', closeWelcome);
+    welcomeModal.addEventListener('click', e => { if (e.target === welcomeModal) closeWelcome(); });
+
     const appMenuBtn = document.getElementById('app-menu-btn');
     const appMenu    = document.getElementById('app-menu');
+    const appMenuSearch = document.getElementById('app-menu-search');
+    const appMenuCats   = document.getElementById('app-menu-cats');
+    const appMenuApps   = document.getElementById('app-menu-apps');
+
+    const AM_APPS = [
+      { app:'terminal',   cat:'system',   icon:'fa fa-terminal',          iconBg:'#2a2a2a', iconColor:'#a78bfa', name:'Terminal',             desc:'Command line shell' },
+      { app:'files',      cat:'system',   icon:'fa fa-folder',             iconBg:'#2a2a2a', iconColor:'#fbbf24', name:'Files',                desc:'File manager' },
+      { app:'settings',   cat:'system',   icon:'fa fa-gear',               iconBg:'#2a2a2a', iconColor:'#94a3b8', name:'System Settings',      desc:'Configure your system' },
+      { app:'browser',    cat:'internet', icon:'fa-brands fa-firefox',     iconBg:'#2a2a2a', iconColor:'#fb923c', name:'Firefox ESR',          desc:'Web browser' },
+      { app:'burp',       cat:'security', icon:'fa fa-shield-halved',      iconBg:'#2a2a2a', iconColor:'#f97316', name:'Burp Suite Pro',       desc:'Web app security testing' },
+      { app:'wireshark',  cat:'security', icon:'fa fa-wave-square',        iconBg:'#2a2a2a', iconColor:'#60a5fa', name:'Wireshark',            desc:'Network traffic analyzer' },
+      { app:'metasploit', cat:'security', icon:'fa fa-skull',              iconBg:'#2a2a2a', iconColor:'#f87171', name:'Metasploit Framework', desc:'Exploitation framework' },
+      { app:'ghidra',     cat:'security', icon:'fa fa-magnifying-glass',   iconBg:'#2a2a2a', iconColor:'#4ade80', name:'Ghidra',               desc:'Reverse engineering suite' },
+      { app:'nmap',       cat:'security', icon:'fa fa-network-wired',      iconBg:'#2a2a2a', iconColor:'#a78bfa', name:'Zenmap',               desc:'Nmap GUI frontend' },
+      { app:'vscode',     cat:'dev',      icon:'fa fa-code',               iconBg:'#2a2a2a', iconColor:'#38bdf8', name:'VS Code',              desc:'Code editor' },
+      { app:'texteditor', cat:'dev',      icon:'fa fa-file-lines',         iconBg:'#2a2a2a', iconColor:'#94a3b8', name:'Text Editor',          desc:'Simple text editor' },
+      { app:'calculator', cat:'dev',      icon:'fa fa-calculator',         iconBg:'#2a2a2a', iconColor:'#34d399', name:'Calculator',           desc:'Desktop calculator' },
+    ];
+
+    let amActiveCat = 'all';
+
+    function amRender(filter) {
+      const q = (filter || '').toLowerCase().trim();
+      const list = AM_APPS.filter(a =>
+        (amActiveCat === 'all' || a.cat === amActiveCat) &&
+        (!q || a.name.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q))
+      );
+      appMenuApps.innerHTML = list.map(a => `
+        <div class="am-app" data-app="${a.app}">
+          <div class="am-app-icon" style="background:${a.iconBg}">
+            <i class="${a.icon}" style="color:${a.iconColor}"></i>
+          </div>
+          <div class="am-app-info">
+            <div class="am-app-name">${a.name}</div>
+            <div class="am-app-desc">${a.desc}</div>
+          </div>
+        </div>`).join('');
+      appMenuApps.querySelectorAll('.am-app').forEach(el => {
+        el.addEventListener('click', () => {
+          appMenu.classList.add('hidden');
+          launchApp(el.dataset.app);
+        });
+      });
+    }
+
     appMenuBtn.addEventListener('click', e => {
       e.stopPropagation();
+      const opening = appMenu.classList.contains('hidden');
       appMenu.classList.toggle('hidden');
+      if (opening) {
+        appMenuSearch.value = '';
+        amActiveCat = 'all';
+        appMenuCats.querySelectorAll('.am-cat').forEach(c => c.classList.toggle('active', c.dataset.cat === 'all'));
+        amRender('');
+        setTimeout(() => appMenuSearch.focus(), 50);
+      }
     });
-    document.addEventListener('click', () => appMenu.classList.add('hidden'));
-    appMenu.querySelectorAll('.app-menu-item').forEach(el => {
-      el.addEventListener('click', () => {
-        appMenu.classList.add('hidden');
-        launchApp(el.dataset.app);
+
+    document.addEventListener('click', e => {
+      if (!appMenu.contains(e.target) && e.target !== appMenuBtn) appMenu.classList.add('hidden');
+    });
+
+    appMenuSearch.addEventListener('input', () => amRender(appMenuSearch.value));
+    appMenuSearch.addEventListener('click', e => e.stopPropagation());
+
+    appMenuCats.querySelectorAll('.am-cat').forEach(cat => {
+      cat.addEventListener('click', e => {
+        e.stopPropagation();
+        amActiveCat = cat.dataset.cat;
+        appMenuCats.querySelectorAll('.am-cat').forEach(c => c.classList.toggle('active', c === cat));
+        amRender(appMenuSearch.value);
       });
     });
+
+    appMenu.querySelectorAll('.am-action-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        appMenu.classList.add('hidden');
+        document.getElementById('app-notice').classList.remove('hidden');
+      });
+    });
+
+    amRender('');
 
     // Desktop icons — single click selects, double-click opens
     document.querySelectorAll('.desk-icon').forEach(icon => {

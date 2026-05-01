@@ -240,11 +240,20 @@ const HANDLERS = [
         if (SIM.hashesOnDisk) files.push('hashes.kerberoast');
         dotDirs  = ['.config', '.local', '.ssh', '.msf4'];
         dotFiles = ['.bash_history', '.bash_logout', '.bashrc', '.profile', '.zshrc'];
+      } else if (cwd.startsWith('/home/') && cwd.split('/').length === 3 && !cwd.endsWith('/')) {
+        // root visiting another user's home — /home/<user>
+        dirs  = new Set(['Desktop','Documents','Downloads','Music','Pictures','Public','Templates','Videos']);
+        files = ['notes.txt'];
+        dotDirs  = ['.config', '.local', '.ssh', '.msf4'];
+        dotFiles = ['.bash_history', '.bash_logout', '.bashrc', '.profile', '.zshrc'];
+      } else if (cwd.startsWith('/home/') && cwd.split('/').length === 4 && !cwd.endsWith('/')) {
+        // root visiting a subdir of another user's home
+        const sub = cwd.split('/')[3];
       } else if (cwd === ('/home/' + SIM.user + '/Desktop')) {
         dirs = new Set([]); files = ['README.txt'];
       } else if (cwd === ('/home/' + SIM.user + '/Documents')) {
         dirs = new Set(['reports','tools']); files = ['credentials.txt','network_notes.md'];
-      } else if (cwd === ('/home/' + SIM.user + '/Downloads')) {
+      } else if (cwd.startsWith('/home/') && cwd.endsWith('/Downloads')) {
         dirs = new Set([]); files = ['linpeas.sh','winpeas.exe','mimikatz.zip'];
       } else if (cwd === ('/home/' + SIM.user + '/Music') ||
                  cwd === ('/home/' + SIM.user + '/Pictures') ||
@@ -451,6 +460,29 @@ const HANDLERS = [
       else target = (SIM.cwd === '/' ? '' : SIM.cwd) + '/' + arg;
       if (SIM.user !== 'root' && (target === '/root' || target.startsWith('/root/'))) {
         return `bash: cd: ${arg}: Permission denied`;
+      }
+      // Case-sensitive existence check against known paths
+      const knownPaths = new Set([
+        '/', '/home', '/root', '/etc', '/etc/ssh', '/etc/apt', '/etc/systemd', '/etc/ssl', '/etc/pam.d',
+        '/tmp', '/opt', '/opt/metasploit-framework', '/opt/impacket', '/proc', '/proc/net',
+        '/dev', '/sys', '/run', '/media', '/mnt', '/srv', '/boot', '/lib', '/lib64',
+        '/sbin', '/bin', '/usr', '/usr/bin', '/usr/sbin', '/usr/local', '/usr/share',
+        '/usr/share/wordlists', '/usr/share/metasploit-framework', '/usr/share/nmap',
+        '/var', '/var/log', '/var/log/apt', '/var/lib', '/var/cache',
+        '/home/' + SIM.user,
+        '/home/' + SIM.user + '/Desktop', '/home/' + SIM.user + '/Documents',
+        '/home/' + SIM.user + '/Downloads', '/home/' + SIM.user + '/Music',
+        '/home/' + SIM.user + '/Pictures', '/home/' + SIM.user + '/Public',
+        '/home/' + SIM.user + '/Templates', '/home/' + SIM.user + '/Videos',
+        '/home/' + SIM.user + '/.ssh', '/home/' + SIM.user + '/.config',
+        '/home/' + SIM.user + '/.local', '/home/' + SIM.user + '/.msf4',
+        '/home/' + SIM.user + '/Documents/reports', '/home/' + SIM.user + '/Documents/tools',
+        '/root', '/root/Desktop', '/root/Documents', '/root/Downloads', '/root/.ssh', '/root/.config', '/root/.msf4',
+      ]);
+      // Also allow any path that exists in SIM.dirs or SIM.files
+      const existsInSim = SIM.dirs.has(target) || Object.keys(simFiles()).some(f => f.startsWith(target + '/'));
+      if (!knownPaths.has(target) && !existsInSim) {
+        return `bash: cd: ${arg}: No such file or directory`;
       }
       SIM.cwd = target;
       return '';
@@ -1395,14 +1427,20 @@ id: 'nmap-discovery',
     ],
   },
 
-  // ── w / who ──────────────────────────────────────────────────────────────
+  // ── w ─────────────────────────────────────────────────────────────────────
   {
-    match: c => c === 'w' || c === 'who' || c === 'who -a',
+    match: c => c === 'w' || /^w\s/.test(c),
     lines: [{ t: () => {
       const t = new Date();
       const hms = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`;
-      return ` ${hms} up 2:13,  1 user,  load average: 0.15, 0.22, 0.18\nUSER     TTY      FROM             LOGIN@   IDLE JCPU   PCPU WHAT\n${SIM.user}     pts/0    10.10.10.1       12:10    0.00s  0.08s  0.00s w`;
+      return ` ${hms} up 2:13,  1 user,  load average: 0.15, 0.22, 0.18\nUSER     TTY      FROM             LOGIN@   IDLE JCPU   PCPU WHAT\n${SIM.user.padEnd(8)} pts/0    10.10.10.1       12:10    0.00s  0.08s  0.00s w`;
     }}],
+  },
+
+  // ── who ───────────────────────────────────────────────────────────────────
+  {
+    match: c => c === 'who' || c === 'who -a' || c === 'who -H',
+    lines: [{ t: () => `${SIM.user.padEnd(8)} pts/0        ${new Date().toISOString().slice(0,16).replace('T',' ')}  (10.10.10.1)` }],
   },
 
   // ── last ─────────────────────────────────────────────────────────────────
@@ -1843,10 +1881,10 @@ id: 'nmap-discovery',
 
   // ── dig / nslookup ────────────────────────────────────────────────────────
   {
-    match: c => /^dig\s/.test(c) || /^nslookup\s/.test(c),
+    match: c => /^dig(\s|$)/.test(c) || /^nslookup(\s|$)/.test(c),
     lines: [{ t: (cmd) => {
       const isDig = cmd.startsWith('dig');
-      const target = cmd.split(' ').pop();
+      const target = cmd.split(' ').filter(Boolean).slice(1).join(' ') || 'corp.local';
       if (isDig) return [
         `; <<>> DiG 9.18.19-1~deb12u1-Debian <<>> ${cmd.replace('dig ','').trim()}`,
         ';; global options: +cmd',
@@ -1877,9 +1915,9 @@ id: 'nmap-discovery',
 
   // ── traceroute / tracepath ────────────────────────────────────────────────
   {
-    match: c => /^(traceroute|tracepath|mtr)\s/.test(c),
+    match: c => /^(traceroute|tracepath|mtr)(\s|$)/.test(c),
     lines: [{ t: (cmd) => {
-      const target = cmd.split(' ').pop();
+      const target = cmd.split(' ').filter(Boolean).slice(1).join(' ') || '10.10.10.10';
       return [
         `traceroute to ${target} (10.10.10.10), 30 hops max, 60 byte packets`,
         ` 1  10.10.10.1 (10.10.10.1)  0.412 ms  0.388 ms  0.374 ms`,
@@ -2527,6 +2565,35 @@ id: 'nmap-discovery',
     ],
   },
 
+  // ── neofetch ─────────────────────────────────────────────────────────────────
+  {
+    match: c => /^neofetch(\s|$)/.test(c),
+    lines: [{ t: () => {
+      const user = SIM.user;
+      const host = 'capy';
+      const t = new Date();
+      const upMins = 133;
+      const upH = Math.floor(upMins / 60), upM = upMins % 60;
+      return [
+        ``,
+        `        ##           ##        \x1b[1;32m${user}@${host}\x1b[0m`,
+        `       ####         ####       \x1b[1;32m${'-'.repeat((user+'@'+host).length)}\x1b[0m`,
+        `      ######       ######      \x1b[1;32mOS:\x1b[0m      Kali GNU/Linux Rolling x86_64`,
+        `     ########     ########     \x1b[1;32mHost:\x1b[0m    VMware Virtual Platform`,
+        `    ##########   ##########    \x1b[1;32mKernel:\x1b[0m  6.6.9-amd64`,
+        `   ############ ############  \x1b[1;32mUptime:\x1b[0m  ${upH} hours, ${upM} mins`,
+        `  ##########################  \x1b[1;32mShell:\x1b[0m   bash 5.2.21`,
+        `  ##########################  \x1b[1;32mCPU:\x1b[0m     Intel i7-10700K (4) @ 3.800GHz`,
+        `  ##########################  \x1b[1;32mGPU:\x1b[0m     VMware SVGA II Adapter`,
+        `  ##########################  \x1b[1;32mMemory:\x1b[0m  2845MiB / 8192MiB`,
+        `   ########################   \x1b[1;32mDisk:\x1b[0m    18G / 50G (38%)`,
+        `    ######################    \x1b[1;32mLocalIP:\x1b[0m 10.10.10.5`,
+        `     ####################     `,
+        ``,
+      ].join('\n');
+    }, cls: 'g' }],
+  },
+
   // ── cowsay ───────────────────────────────────────────────────────────────
   {
     match: c => /^cowsay(\s|$)/.test(c),
@@ -2850,6 +2917,119 @@ id: 'nmap-discovery',
     lines: [{ t: () => { SIM.msf = false; SIM.msfModule = null; SIM.msfMeter = false; SIM.msfMeterWin = false; return ''; } }],
   },
 
+  // ── lsof ──────────────────────────────────────────────────────────────────
+  {
+    match: c => /^lsof(\s|$)/.test(c),
+    lines: [
+      { t: 'COMMAND     PID   USER   FD   TYPE DEVICE SIZE/OFF NODE NAME', cls: 'b' },
+      { t: () => `bash      ${process?.pid || 1234}   ${SIM.user}  cwd    DIR    8,1     4096  131073 ${SIM.cwd}` },
+      { t: 'sshd         591   root    3u  IPv4  14231      0t0  TCP *:ssh (LISTEN)', cls: 'g' },
+      { t: 'sshd         591   root    4u  IPv6  14233      0t0  TCP *:ssh (LISTEN)', cls: 'g' },
+      { t: 'systemd-r    412  systemd-resolve   13u  IPv4  12891  0t0  UDP 127.0.0.53:domain', },
+      { t: 'NetworkMa    432   root    8u  IPv4  13201      0t0  TCP 10.10.10.5:51234->10.10.10.10:445 (ESTABLISHED)', cls: 'y' },
+      { t: 'cupsd        798   root    7u  IPv4  15023      0t0  TCP 127.0.0.1:ipp (LISTEN)' },
+      { t: 'python3     1145   ' + SIM.user + '    3u  IPv4  18923      0t0  TCP *:4444 (LISTEN)', cls: 'r' },
+    ],
+  },
+
+  // ── crontab ───────────────────────────────────────────────────────────────
+  {
+    match: c => /^crontab(\s|$)/.test(c),
+    lines: [{ t: (cmd) => {
+      if (cmd.includes('-l')) {
+        if (SIM.user === 'root') return [
+          '# root crontab',
+          '*/5 * * * * /usr/local/bin/backup.sh',
+          '0 2 * * * /usr/bin/find /tmp -mtime +7 -delete',
+          '0 0 * * 0 /usr/sbin/logrotate /etc/logrotate.conf',
+        ].join('\n');
+        return [
+          '# ' + SIM.user + ' crontab',
+          'no crontab for ' + SIM.user,
+        ].join('\n');
+      }
+      return 'crontab: usage error: unrecognized option';
+    }}],
+  },
+
+  // ── sudo -l ───────────────────────────────────────────────────────────────
+  {
+    match: c => /^sudo\s+-l/.test(c),
+    lines: [{ t: () => {
+      if (SIM.user === 'root') return 'User root may run the following commands on capy:\n    (ALL : ALL) ALL';
+      return [
+        'Matching Defaults entries for ' + SIM.user + ' on capy:',
+        '    env_reset, mail_badpass, secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+        '',
+        'User ' + SIM.user + ' may run the following commands on capy:',
+        '    (ALL : ALL) ALL',
+      ].join('\n');
+    }, cls: 'y' }],
+  },
+
+  // ── cat /etc/passwd ───────────────────────────────────────────────────────
+  {
+    match: c => c === 'cat /etc/passwd',
+    lines: [
+      { t: 'root:x:0:0:root:/root:/bin/bash', cls: 'r' },
+      { t: 'daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin', cls: 'd' },
+      { t: 'bin:x:2:2:bin:/bin:/usr/sbin/nologin', cls: 'd' },
+      { t: 'sys:x:3:3:sys:/dev:/usr/sbin/nologin', cls: 'd' },
+      { t: 'www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin', cls: 'd' },
+      { t: 'nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin', cls: 'd' },
+      { t: 'systemd-network:x:998:998:systemd Network Management:/:/usr/sbin/nologin', cls: 'd' },
+      { t: 'systemd-resolve:x:997:997:systemd Resolver:/:/usr/sbin/nologin', cls: 'd' },
+      { t: 'sshd:x:105:65534::/run/sshd:/usr/sbin/nologin', cls: 'd' },
+      { t: () => SIM.user + ':x:1000:1000:,,,:/home/' + SIM.user + ':/bin/bash', cls: 'g' },
+    ],
+  },
+
+  // ── cat /etc/shadow ───────────────────────────────────────────────────────
+  {
+    match: c => c === 'cat /etc/shadow',
+    requireRoot: true,
+    lines: [
+      { t: 'root:$6$rounds=656000$aBcDeFgHiJkLmNoP$hashedpassword1234567890abcdefghijklmnopqrstuvwxyz0123456789ABCDEF:19737:0:99999:7:::', cls: 'r' },
+      { t: 'daemon:*:19737:0:99999:7:::', cls: 'd' },
+      { t: 'nobody:*:19737:0:99999:7:::', cls: 'd' },
+      { t: () => SIM.user + ':$6$rounds=656000$xYzAbCdEfGhIjKlM$anotherhash0987654321zyxwvutsrqponmlkjihgfedcba9876543210ZYXWVUT:19737:0:99999:7:::', cls: 'y' },
+    ],
+  },
+
+  // ── cat /etc/hosts ────────────────────────────────────────────────────────
+  {
+    match: c => c === 'cat /etc/hosts',
+    lines: [
+      { t: '127.0.0.1       localhost' },
+      { t: '127.0.1.1       capy' },
+      { t: '::1             localhost ip6-localhost ip6-loopback' },
+      { t: '' },
+      { t: '# Lab network', cls: 'd' },
+      { t: '10.10.10.1      gateway.corp.local', cls: 'b' },
+      { t: '10.10.10.5      capy.corp.local', cls: 'g' },
+      { t: '10.10.10.10     dc01.corp.local CORP.LOCAL', cls: 'y' },
+      { t: '10.10.10.20     srv01.corp.local', cls: 'b' },
+      { t: '10.10.10.50     legacy01.corp.local', cls: 'r' },
+    ],
+  },
+
+  // ── cat /etc/os-release ───────────────────────────────────────────────────
+  {
+    match: c => c === 'cat /etc/os-release',
+    lines: [
+      { t: 'PRETTY_NAME="Kali GNU/Linux Rolling"', cls: 'g' },
+      { t: 'NAME="Kali GNU/Linux"' },
+      { t: 'VERSION_ID="2024.1"' },
+      { t: 'VERSION="2024.1"' },
+      { t: 'VERSION_CODENAME=kali-rolling' },
+      { t: 'ID=kali' },
+      { t: 'ID_LIKE=debian' },
+      { t: 'HOME_URL="https://www.kali.org/"' },
+      { t: 'SUPPORT_URL="https://forums.kali.org/"' },
+      { t: 'BUG_REPORT_URL="https://bugs.kali.org/"' },
+    ],
+  },
+
   // ── Help / misc ───────────────────────────────────────────────────────────
   {
     match: c => c === 'help' || c === 'help --ctf',
@@ -2893,14 +3073,17 @@ function runCommand(rawInput) {
 
     // ── cd ───────────────────────────────────────────────────────────────────
     if (/^cd(\s|$)/i.test(cmd)) {
-      const arg = cmd.replace(/^cd\s*/i, '').trim();
+      const arg = cmd.replace(/^cd\s*/i, '').trim().replace(/\//g, '\\');
       if (!arg || arg === '\\') { SIM.winCwd = 'C:\\'; return { lines: [{ t: '' }] }; }
       // Resolve path
       const resolve = (base, rel) => {
         if (/^[A-Za-z]:\\/.test(rel)) return rel.replace(/\\+$/, '') || rel; // absolute
+        if (/^[A-Za-z]:$/.test(rel)) return rel + '\\';
         if (rel === '..') {
           const parts = base.replace(/\\+$/, '').split('\\');
-          return parts.length > 1 ? parts.slice(0, -1).join('\\') || 'C:\\' : base;
+          if (parts.length <= 1) return 'C:\\';
+          const up = parts.slice(0, -1).join('\\');
+          return up.match(/^[A-Za-z]:$/) ? up + '\\' : up;
         }
         return (base.replace(/\\+$/, '') + '\\' + rel).replace(/\\{2,}/g, '\\');
       };
