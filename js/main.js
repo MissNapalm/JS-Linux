@@ -61,14 +61,14 @@
     SIM.user = user;
     SIM.cwd  = '/home/' + user;
     const h = '/home/' + user;
-    // Copy default home files from /home/capy to the real user's home
-    const defaults = ['/home/capy/notes.txt', '/home/capy/.bash_history'];
+    // Copy default home files from /home/rembrandt to the real user's home
+    const defaults = ['/home/rembrandt/notes.txt', '/home/rembrandt/.bash_history'];
     for (const src of defaults) {
-      const dest = src.replace('/home/capy/', h + '/');
+      const dest = src.replace('/home/rembrandt/', h + '/');
       if (!SIM.files[dest]) SIM.files[dest] = SIM.files[src] || '';
     }
     // Populate home subdirectory files
-    SIM.files[h + '/Desktop/README.txt']                    = `Welcome to CapyOS 2024.2\nThis is your Desktop folder.`;
+    SIM.files[h + '/Desktop/README.txt']                    = `Welcome to RembrandtOS 2024.2\nThis is your Desktop folder.`;
     SIM.files[h + '/Documents/credentials.txt']             = `# Credentials found during engagement\n# DO NOT SHARE\njohn.doe : Password1!\nsvc_backup : Backup2023!`;
     SIM.files[h + '/Documents/network_notes.md']            = `# Network Notes\n## Targets\n- 10.10.10.10 - DC01.CORP.LOCAL (Domain Controller)\n- 10.10.10.5  - Kali attack box\n\n## Open Ports (DC01)\n- 88  Kerberos\n- 389 LDAP\n- 445 SMB\n- 3268 Global Catalog`;
     SIM.files[h + '/Documents/reports/pentest_report_draft.md'] = `# Penetration Test Report - DRAFT\n## Executive Summary\nA full domain compromise was achieved via Kerberoasting.\n## Findings\n1. Weak service account passwords\n2. No account lockout on service accounts\n3. RC4 encryption allowed on Kerberos tickets`;
@@ -86,7 +86,7 @@
     SIM.files['/etc/passwd'] = `root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n${user}:x:1000:1000:${user},,,:/home/${user}:/bin/bash`;
     SIM.files['/etc/group']  = `root:x:0:\ndaemon:x:1:\nsudo:x:27:${user}\nadm:x:4:${user}\ncdrom:x:24:${user}\ndip:x:30:${user}\npluggdev:x:46:${user}\nnetdev:x:109:${user}\n${user}:x:1000:`;
     SIM.files['/etc/shadow'] = `root:!:19736:0:99999:7:::\ndaemon:*:19736:0:99999:7:::\n${user}:$6$rounds=656000$randomsalt$hashedpassword:19736:0:99999:7:::`;
-    SIM.files['/etc/hostname'] = user === 'capy' ? 'capy' : user;
+    SIM.files['/etc/hostname'] = user === 'rembrandt' ? 'rembrandt' : user;
   }
 
   authSubmit.addEventListener('click', doAuth);
@@ -288,7 +288,7 @@
     _termCount++;
     const label = _termCount === 1 ? '>_ Terminal' : `>_ Terminal ${_termCount}`;
 
-    const win = createWindow('Terminal — ' + SIM.user + '@capy', 720, 460, `
+    const win = createWindow('Terminal — ' + SIM.user + '@rembrandt', 720, 460, `
       <div class="term-tabs-bar"></div>
       <div class="term-panes"></div>
     `);
@@ -429,7 +429,7 @@
 
   function fmGetFileContent(path) {
     const extras = SIM.hashesOnDisk ? {
-      '/home/capy/hashes.kerberoast': KRB5_HASHES,
+      '/home/rembrandt/hashes.kerberoast': KRB5_HASHES,
       '/root/hashes.kerberoast': KRB5_HASHES,
     } : {};
     const all = {
@@ -457,12 +457,12 @@
           <nav class="fm-sidebar">
             <div class="fm-sidebar-label">Places</div>
             <div class="fm-sidebar-item" data-path="/home/" + SIM.user><i class="fa fa-house"></i> Home</div>
-            <div class="fm-sidebar-item" data-path="/home/capy/Desktop"><i class="fa fa-display"></i> Desktop</div>
-            <div class="fm-sidebar-item" data-path="/home/capy/Documents"><i class="fa fa-folder"></i> Documents</div>
-            <div class="fm-sidebar-item" data-path="/home/capy/Downloads"><i class="fa fa-arrow-down"></i> Downloads</div>
-            <div class="fm-sidebar-item" data-path="/home/capy/Music"><i class="fa fa-music"></i> Music</div>
-            <div class="fm-sidebar-item" data-path="/home/capy/Pictures"><i class="fa fa-image"></i> Pictures</div>
-            <div class="fm-sidebar-item" data-path="/home/capy/Videos"><i class="fa fa-film"></i> Videos</div>
+            <div class="fm-sidebar-item" data-path="/home/rembrandt/Desktop"><i class="fa fa-display"></i> Desktop</div>
+            <div class="fm-sidebar-item" data-path="/home/rembrandt/Documents"><i class="fa fa-folder"></i> Documents</div>
+            <div class="fm-sidebar-item" data-path="/home/rembrandt/Downloads"><i class="fa fa-arrow-down"></i> Downloads</div>
+            <div class="fm-sidebar-item" data-path="/home/rembrandt/Music"><i class="fa fa-music"></i> Music</div>
+            <div class="fm-sidebar-item" data-path="/home/rembrandt/Pictures"><i class="fa fa-image"></i> Pictures</div>
+            <div class="fm-sidebar-item" data-path="/home/rembrandt/Videos"><i class="fa fa-film"></i> Videos</div>
             <div class="fm-sidebar-label">System</div>
             <div class="fm-sidebar-item" data-path="/"><i class="fa fa-server"></i> File System</div>
             <div class="fm-sidebar-item" data-path="/root"><i class="fa fa-user-shield"></i> Root</div>
@@ -594,7 +594,7 @@
         const map = {
           Desktop: '🖥', Documents: '📄', Downloads: '⬇️', Music: '🎵',
           Pictures: '🖼', Videos: '🎬', home: '🏠', root: '🔒',
-          capy: '👤', etc: '⚙️', tmp: '📂', usr: '📂', var: '📂',
+          rembrandt: '👤', etc: '⚙️', tmp: '📂', usr: '📂', var: '📂',
           share: '📂', wordlists: '📋', log: '📋',
         };
         return `<span class="fm-icon-emoji">${map[item.name] || '📁'}</span>`;

@@ -91,7 +91,7 @@ function createTerminal() {
 
       this._printWelcome();
       // new tabs always start as the registered user, never inherit root from another tab
-      const registeredUser = localStorage.getItem('hacklet_user') || 'capy';
+      const registeredUser = localStorage.getItem('hacklet_user') || 'rembrandt';
       this._user = registeredUser;
       this._cwd  = '/home/' + registeredUser;
       this._windowsShell = false;
@@ -166,7 +166,7 @@ function createTerminal() {
         } else prompt = '\x1b[1;31mmsf6\x1b[0m \x1b[31m>\x1b[0m ';
       } else {
         prompt =
-          '\x1b[35m\u250c\u2500\u2500(\x1b[0m\x1b[32m' + user + '@capy\x1b[0m' +
+          '\x1b[35m\u250c\u2500\u2500(\x1b[0m\x1b[32m' + user + '@rembrandt\x1b[0m' +
           '\x1b[35m)-[\x1b[0m\x1b[94m' + cwd + '\x1b[0m\x1b[35m]\x1b[0m\r\n' +
           '\x1b[35m\u2514\u2500\x1b[0m\x1b[97m' + sigil + ' \x1b[0m';
       }
@@ -197,7 +197,7 @@ function createTerminal() {
       const cwd   = (this._cwd || SIM.cwd) === home ? '~' : (this._cwd || SIM.cwd);
       const sigil = user === 'root' ? '#' : '$';
       this._xterm.writeln(
-        '\x1b[35m┌──(\x1b[0m\x1b[32m' + user + '@capy\x1b[0m' +
+        '\x1b[35m┌──(\x1b[0m\x1b[32m' + user + '@rembrandt\x1b[0m' +
         '\x1b[35m)-[\x1b[0m\x1b[94m' + cwd + '\x1b[0m\x1b[35m]\x1b[0m'
       );
       this._xterm.write('\x1b[35m└─\x1b[0m\x1b[97m' + sigil + ' \x1b[0m');
@@ -913,7 +913,7 @@ function createTerminal() {
       }
 
       if (result.dropRoot) {
-        const registeredUser = localStorage.getItem('hacklet_user') || 'capy';
+        const registeredUser = localStorage.getItem('hacklet_user') || 'rembrandt';
         this._user = registeredUser;
         this._cwd  = '/home/' + registeredUser;
         SIM.user = registeredUser;
@@ -1018,7 +1018,7 @@ function createTerminal() {
       if (!wasRoot) SIM.user = 'root';
       const result = runCommand(pendingCmd);
       const permanentRoot = /^(-i$|-s\s*$|su(\s|$))/.test(pendingCmd.trim());
-      if (!wasRoot && !permanentRoot) SIM.user = this._user || 'capy';
+      if (!wasRoot && !permanentRoot) SIM.user = this._user || 'rembrandt';
       this._simPull();
       if (!result) { this._writePrompt(); return; }
       if (result.clear) { this._atomicClearAndPrompt(); return; }
