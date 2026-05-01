@@ -987,7 +987,10 @@ function createTerminal() {
         if (result.progressOnEnter && result.lines && result.lines.length > 0) {
           const firstLine = result.lines[0];
           const t = typeof firstLine.t === 'function' ? firstLine.t() : firstLine.t;
-          if (t) this._writeLine(t, firstLine.cls || '');
+          if (t) {
+            const color = this._clsColor(firstLine.cls || '');
+            this._xterm.write((color ? color + t + '\x1b[0m' : t) + '\r\n');
+          }
           result._firstLinePrinted = true;
         }
         this._busy = true;
@@ -1184,10 +1187,9 @@ function createTerminal() {
           this._onEnterProgress = () => {
             const elapsed = Date.now() - this._loadStart;
             const lines = progressFn(elapsed, ms);
-            lines.forEach((l, i) => {
+            lines.forEach((l) => {
               const color = this._clsColor(l.cls);
               const text = color ? color + l.t + '\x1b[0m' : l.t;
-              // Use write+\r\n instead of writeln to avoid trailing blank line
               this._xterm.write(text + '\r\n');
             });
           };

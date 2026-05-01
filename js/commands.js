@@ -640,12 +640,17 @@ const HANDLERS = [
     id: 'nmap-discovery',
     loadTime: () => jitter(2600, 500),
     progressFn: (elapsed, total) => {
-      const pct = Math.min(99.9, elapsed / total * 100).toFixed(1);
+      const pct = Math.min(99.9, elapsed / total * 100).toFixed(2);
+      const elSec = Math.floor(elapsed / 1000);
+      const elM = Math.floor(elSec / 60), elS = elSec % 60;
       const remMs = Math.max(0, total - elapsed);
-      const remS = (remMs / 1000).toFixed(0);
+      const remSec = Math.floor(remMs / 1000);
+      const remM = Math.floor(remSec / 60), remS2 = remSec % 60;
+      const etc = new Date(Date.now() + remMs);
+      const etcStr = `${String(etc.getHours()).padStart(2,'0')}:${String(etc.getMinutes()).padStart(2,'0')}`;
       return [
-        { t: `Stats: 0:${String(Math.floor(elapsed/1000)).padStart(2,'0')} elapsed; 0 hosts completed (0 up), 256 undergoing Ping Scan`, cls: 'd' },
-        { t: `Ping Scan Timing: About ${pct}% done; ETC: --:-- (0:${remS.padStart(2,'0')} remaining)`, cls: 'd' },
+        { t: `Stats: 0:${String(elM).padStart(2,'0')}:${String(elS).padStart(2,'0')} elapsed; 0 hosts completed (0 up), 256 undergoing Ping Scan`, cls: 'd' },
+        { t: `Ping Scan Timing: About ${pct}% done; ETC: ${etcStr} (0:${String(remM).padStart(2,'0')}:${String(remS2).padStart(2,'0')} remaining)`, cls: 'd' },
       ];
     },
     progressOnEnter: true,
@@ -674,11 +679,16 @@ const HANDLERS = [
     progressOnEnter: true,
     progressFn: (elapsed, total) => {
       const pct = Math.min(99.99, elapsed / total * 100).toFixed(2);
+      const elSec = Math.floor(elapsed / 1000);
+      const elM = Math.floor(elSec / 60), elS = elSec % 60;
       const remMs = Math.max(0, total - elapsed);
       const remSec = Math.floor(remMs / 1000);
+      const remM = Math.floor(remSec / 60), remS2 = remSec % 60;
+      const etc = new Date(Date.now() + remMs);
+      const etcStr = `${String(etc.getHours()).padStart(2,'0')}:${String(etc.getMinutes()).padStart(2,'0')}`;
       return [
-        { t: `Stats: 0:${String(Math.floor(elapsed/1000)).padStart(2,'0')} elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan`, cls: 'd' },
-        { t: `SYN Stealth Scan Timing: About ${pct}% done; ETC: --:-- (0:${String(remSec).padStart(2,'0')} remaining)`, cls: 'd' },
+        { t: `Stats: 0:${String(elM).padStart(2,'0')}:${String(elS).padStart(2,'0')} elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan`, cls: 'd' },
+        { t: `SYN Stealth Scan Timing: About ${pct}% done; ETC: ${etcStr} (0:${String(remM).padStart(2,'0')}:${String(remS2).padStart(2,'0')} remaining)`, cls: 'd' },
       ];
     },
     match: c => /^nmap\b/.test(c) && c.includes('10.10.10.50'),
@@ -728,8 +738,8 @@ const HANDLERS = [
       const etc   = new Date(Date.now() + remMs);
       const etcStr = `${String(etc.getHours()).padStart(2,'0')}:${String(etc.getMinutes()).padStart(2,'0')}`;
       return [
-        { t: `Stats: ${elMin}:${String(elRemS).padStart(2,'0')} elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan`, cls: 'd' },
-        { t: `SYN Stealth Scan Timing: About ${pct}% done; ETC: ${etcStr} (${remMin}:${String(remRemS).padStart(2,'0')} remaining)`, cls: 'd' },
+        { t: `Stats: 0:${String(elMin).padStart(2,'0')}:${String(elRemS).padStart(2,'0')} elapsed; 0 hosts completed (1 up), 1 undergoing SYN Stealth Scan`, cls: 'd' },
+        { t: `SYN Stealth Scan Timing: About ${pct}% done; ETC: ${etcStr} (0:${String(remMin).padStart(2,'0')}:${String(remRemS).padStart(2,'0')} remaining)`, cls: 'd' },
       ];
     },
     match: c => /^nmap\b/.test(c) && c.includes('10.10.10.10'),
