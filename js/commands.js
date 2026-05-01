@@ -1472,6 +1472,27 @@ const HANDLERS = [
       const nmT = `0:0${3 + Math.floor(tick / 30)}.${String((21 + tick) % 100).padStart(2,'0')}`;
       const baT = `0:0${Math.floor((44 + tick * 3) / 100)}.${String((44 + tick * 3) % 100).padStart(2,'0')}`;
       const toT = `0:00.${String(tick % 100).padStart(2,'0')}`;
+      // build process list with fluctuating CPU and sort by CPU each tick
+      const procs = [
+        { pid: 432,  user: 'root',      cpu: r(parseFloat(us)*0.6, 2.0), mem: 0.3, virt: 545928, res: 24568, time: nmT,       cmd: 'NetworkManager' },
+        { pid: 1234, user: SIM.user,    cpu: r(2.1, 1.2),                mem: 0.1, virt: 11936,  res: 5192,  time: baT,       cmd: 'bash' },
+        { pid: 891,  user: SIM.user,    cpu: r(1.4, 1.8),                mem: 0.6, virt: 231420, res: 52400, time: '0:01.23', cmd: 'Xorg' },
+        { pid: 1189, user: SIM.user,    cpu: r(0.8, 1.0),                mem: 0.9, virt: 456748, res: 78432, time: '0:02.11', cmd: 'xfce4-session' },
+        { pid: 1,    user: 'root',      cpu: r(0.1, 0.2),                mem: 0.2, virt: 168796, res: 13132, time: '0:02.14', cmd: 'systemd' },
+        { pid: 2,    user: 'root',      cpu: 0.0,                        mem: 0.0, virt: 0,      res: 0,     time: '0:00.01', cmd: '[kthreadd]' },
+        { pid: 3,    user: 'root',      cpu: r(0.0, 0.1),                mem: 0.0, virt: 0,      res: 0,     time: '0:00.00', cmd: '[rcu_gp]' },
+        { pid: 591,  user: 'root',      cpu: r(0.0, 0.3),                mem: 0.1, virt: 12312,  res: 7712,  time: '0:00.08', cmd: 'sshd' },
+        { pid: 623,  user: 'root',      cpu: r(0.0, 0.1),                mem: 0.0, virt: 11688,  res: 3560,  time: '0:00.01', cmd: 'cron' },
+        { pid: 798,  user: 'root',      cpu: r(0.0, 0.2),                mem: 0.0, virt: 8192,   res: 2048,  time: '0:00.03', cmd: 'cupsd' },
+        { pid: 412,  user: 'systemd-r', cpu: r(0.0, 0.1),                mem: 0.0, virt: 14532,  res: 4096,  time: '0:00.02', cmd: 'systemd-resolve' },
+        { pid: 1337, user: SIM.user,    cpu: r(0.0, 0.1),                mem: 0.0, virt: 14240,  res: 3864,  time: toT,       cmd: '\x1b[1;97mtop\x1b[0m' },
+      ];
+      procs.sort((a, b) => b.cpu - a.cpu);
+      const procRows = procs.map(p => {
+        const cs = p.cpu.toFixed(1).padStart(4);
+        const cc = p.cpu > 5 ? `\x1b[33m${cs}\x1b[0m` : p.cpu > 1 ? `\x1b[32m${cs}\x1b[0m` : cs;
+        return { t: `${String(p.pid).padStart(7)} ${p.user.padEnd(9)} 20   0 ${String(p.virt).padStart(7)} ${String(p.res).padStart(6)} ${String(Math.floor(p.res*0.7)).padStart(6)} S ${cc}   ${p.mem.toFixed(1)}   ${p.time} ${p.cmd}` };
+      });
       return [
         { t: `top - ${hms} up  2:${upM}:${upS},  1 user,  load average: ${la1}, ${la5}, ${la15}` },
         { t: `Tasks: \x1b[97m142\x1b[0m total,   \x1b[32m1\x1b[0m running, \x1b[0m141\x1b[0m sleeping,   0 stopped,   0 zombie` },
@@ -1480,16 +1501,7 @@ const HANDLERS = [
         { t: `\x1b[94mMiB Swap\x1b[0m:   2048.0 total,   2048.0 free,      0.0 used.   ${(8192 - parseFloat(memUsed)).toFixed(1)} avail Mem` },
         { t: '' },
         { t: `\x1b[7m    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND                              \x1b[0m` },
-        { t: `    432 root      20   0  545928  24568  18844 S  \x1b[33m${String(us).padStart(4)}\x1b[0m   0.3   ${nmT} NetworkManager` },
-        { t: `   1234 ${SIM.user.padEnd(9)} 20   0   11936   5192   3824 S  \x1b[32m${r(2.1,0.8).toFixed(1).padStart(4)}\x1b[0m   0.1   ${baT} bash` },
-        { t: `      1 root      20   0  168796  13132   8392 S   0.0   0.2   0:02.14 systemd` },
-        { t: `      2 root      20   0       0      0      0 S   0.0   0.0   0:00.01 [kthreadd]` },
-        { t: `      3 root      20   0       0      0      0 I   0.0   0.0   0:00.00 [rcu_gp]` },
-        { t: `    591 root      20   0   12312   7712   6448 S   0.0   0.1   0:00.08 sshd` },
-        { t: `    623 root      20   0   11688   3560   3284 S   0.0   0.0   0:00.01 cron` },
-        { t: `    891 rembrandt 20   0  231420  52400  38100 S   0.0   0.6   0:01.23 Xorg` },
-        { t: `   1189 rembrandt 20   0  456748  78432  59200 S   0.0   0.9   0:02.11 xfce4-session` },
-        { t: `   1337 ${SIM.user.padEnd(9)} 20   0   14240   3864   3188 R   0.0   0.0   ${toT} \x1b[1;97mtop\x1b[0m` },
+        ...procRows,
         { t: '' },
         { t: `\x1b[90mq or Ctrl+C to quit\x1b[0m` },
       ];
@@ -2946,8 +2958,34 @@ const HANDLERS = [
   {
     id: 'msfconsole',
     match: c => c === 'msfconsole' || c === 'msfconsole -q',
-    loadTime: () => jitter(2800, 600),
-    lines: [{ t: () => { SIM.msf = true; SIM.msfModule = null; return { openMsf: true }; } }],
+    stepLines: [
+      { t: '\x1b[90m[*] Starting the Metasploit Framework console...\x1b[0m', delay: 0 },
+      { t: '\x1b[90m[*] Checking for updates...\x1b[0m', delay: jitter(400, 100) },
+      { t: '\x1b[90m[*] Loading modules...\x1b[0m', delay: jitter(700, 150) },
+      { t: '', delay: jitter(900, 200) },
+      { t: '\x1b[31m  ██████╗ ███████╗███╗   ███╗██████╗ ██████╗  █████╗ ███╗   ██╗██████╗ ████████╗\x1b[0m', delay: 40 },
+      { t: '\x1b[31m  ██╔══██╗██╔════╝████╗ ████║██╔══██╗██╔══██╗██╔══██╗████╗  ██║██╔══██╗╚══██╔══╝\x1b[0m', delay: 40 },
+      { t: '\x1b[31m  ██████╔╝█████╗  ██╔████╔██║██████╔╝██████╔╝███████║██╔██╗ ██║██║  ██║   ██║   \x1b[0m', delay: 40 },
+      { t: '\x1b[31m  ██╔══██╗██╔══╝  ██║╚██╔╝██║██╔══██╗██╔══██╗██╔══██║██║╚██╗██║██║  ██║   ██║   \x1b[0m', delay: 40 },
+      { t: '\x1b[31m  ██║  ██║███████╗██║ ╚═╝ ██║██████╔╝██║  ██║██║  ██║██║ ╚████║██████╔╝   ██║   \x1b[0m', delay: 40 },
+      { t: '\x1b[31m  ╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝    ╚═╝   \x1b[0m', delay: 40 },
+      { t: '', delay: 100 },
+      { t: '\x1b[90m       Exploitation Framework \u2014 because patching is optional, apparently\x1b[0m', delay: 200 },
+      { t: '', delay: 80 },
+      { t: '\x1b[90m       =[ \x1b[0m\x1b[1;31mmetasploit v6.3.44-dev\x1b[0m\x1b[90m                          ]\x1b[0m', delay: 100 },
+      { t: '\x1b[90m+ -- --=[ \x1b[0m2374 exploits - 1232 auxiliary - 413 post\x1b[90m       ]\x1b[0m', delay: 60 },
+      { t: '\x1b[90m+ -- --=[ \x1b[0m1171 payloads - 46 encoders - 11 nops\x1b[90m         ]\x1b[0m', delay: 60 },
+      { t: '\x1b[90m+ -- --=[ \x1b[0m9 evasion\x1b[90m                                      ]\x1b[0m', delay: 60 },
+      { t: '', delay: 80 },
+      { t: '\x1b[90m       Metasploit tip: \x1b[0mUse \x1b[33msearch\x1b[0m to find modules by name or CVE', delay: 200 },
+      { t: '', delay: 100 },
+    ],
+    lines: [],
+    after: () => {
+      SIM.msf = true;
+      SIM.msfModule = null;
+      SIM.msfOpts['__global__'] = { LHOST: '10.10.20.5' };
+    },
   },
 
   // ── msf: use module ───────────────────────────────────────────────────────
@@ -2958,6 +2996,10 @@ const HANDLERS = [
       const mod = c.replace(/^use\s+/, '').trim();
       SIM.msfModule = mod;
       SIM.msfOpts[mod] = SIM.msfOpts[mod] || {};
+      // inherit global LHOST if not already set
+      if (!SIM.msfOpts[mod].LHOST && SIM.msfOpts['__global__']?.LHOST) {
+        SIM.msfOpts[mod].LHOST = SIM.msfOpts['__global__'].LHOST;
+      }
       return { openMsf: true };
     }}],
   },
