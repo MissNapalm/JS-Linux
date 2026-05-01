@@ -17,7 +17,7 @@
 <div id="auth-screen" class="fixed inset-0 flex items-center justify-center z-[999] bg-slate-100">
   <div class="flex flex-col items-center gap-4 bg-white shadow-xl px-10 pt-6 pb-10" style="width:620px;border:1px solid #e2e8f0">
 
-    <img src="assets/icons/capy.jpeg" alt="RembrandtOS" style="width:600px;height:auto;object-fit:contain;margin-bottom:-12px">
+    <img src="assets/icons/rembrandt.png" alt="RembrandtOS" style="width:600px;height:auto;object-fit:contain;margin-bottom:-12px">
 
     <div class="text-center -mt-1">
       <div id="auth-title" class="text-lg font-bold text-slate-800" style="font-family:'Ubuntu',sans-serif">Sign In</div>
@@ -250,55 +250,50 @@
 
         <!-- Slide 1: What is this -->
         <div class="wc-slide" style="padding:32px 36px 24px">
-          <div style="font-size:72px;text-align:center;margin-bottom:18px">💡</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:10px">What is RembrandtOS?</div>
-          <p style="font-size:13px;color:#475569;line-height:1.75">
-            RembrandtOS is a <strong style="color:#1e293b">browser-based Linux terminal simulator</strong> built entirely in JavaScript.
-            There's no real OS, no real network — everything is simulated, including the filesystem,
-            running processes, and network responses from target machines.
+          <div style="font-size:48px;text-align:center;margin-bottom:14px">☠️</div>
+          <div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:12px;text-align:center">Welcome to RembrandtOS</div>
+          <p style="font-size:13px;color:#475569;line-height:1.8">
+            A <strong style="color:#7c3aed">fully simulated Linux environment</strong> running in your browser. Real tools, real attack chains, real output — zero setup, zero risk.
           </p>
-          <p style="font-size:13px;color:#475569;line-height:1.75;margin-top:10px">
-            It's designed to let you practice real penetration testing workflows —
-            from recon all the way to domain compromise — without needing a lab environment.
+          <p style="font-size:13px;color:#475569;line-height:1.8;margin-top:10px">
+            Run <code style="color:#7c3aed">nmap</code>, <code style="color:#7c3aed">crackmapexec</code>, <code style="color:#7c3aed">impacket</code>, <code style="color:#7c3aed">metasploit</code> and more against a simulated Active Directory network. Everything responds like the real thing — because it was built from real pentest output.
           </p>
+          <p style="font-size:12px;color:#94a3b8;margin-top:12px;font-style:italic">No VMs. No installs. No network traffic. Just hacking.</p>
         </div>
 
-        <!-- Slide 2: How it works -->
+        <!-- Slide 2: The labs -->
         <div class="wc-slide" style="padding:32px 36px 24px;display:none">
-          <div style="font-size:36px;margin-bottom:14px">⚙️</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">How it works</div>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div class="wc-fact"><span class="wc-pill">FS</span> The filesystem is a JavaScript object. Files you create with <code>touch</code> or <code>nano</code> persist for the session.</div>
-            <div class="wc-fact"><span class="wc-pill">CMD</span> Commands are matched against a handler list — each one returns realistic simulated output.</div>
-            <div class="wc-fact"><span class="wc-pill">NET</span> The simulated network has real targets: a domain controller at <code>10.10.10.10</code>, a legacy box, and more.</div>
-            <div class="wc-fact"><span class="wc-pill">UX</span> Tab completion, command history (↑↓), multi-tab terminals, and a file manager all work.</div>
+          <div style="font-size:36px;margin-bottom:14px">🎯</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">Two Attack Labs</div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div class="wc-fact"><span class="wc-pill" style="background:#ede9fe;color:#6d28d9">Lab 1</span> <div><strong style="color:#1e293b">Kerberoasting</strong> — Compromise a Windows domain from a single port scan. Enumerate users, steal Kerberos tickets, crack service account passwords, dump NTDS.dit, and own the DC as SYSTEM. 11 steps, 3050 pts.</div></div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#fee2e2;color:#b91c1c">Lab 2</span> <div><strong style="color:#1e293b">EternalBlue</strong> — Exploit MS17-010, the NSA vulnerability that powered WannaCry. No credentials needed. Get a Meterpreter shell as SYSTEM in one shot. 9 steps, 1950 pts.</div></div>
           </div>
+          <p style="font-size:12px;color:#94a3b8;margin-top:12px">More labs coming. Switch between them in the CTF panel →</p>
         </div>
 
-        <!-- Slide 3: The lab -->
+        <!-- Slide 3: The network -->
         <div class="wc-slide" style="padding:32px 36px 24px;display:none">
-          <div style="font-size:36px;margin-bottom:14px">🏆</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:10px">The CTF Lab</div>
-          <p style="font-size:13px;color:#475569;line-height:1.75">
-            The main lab walks you through a full <strong style="color:#1e293b">Kerberoasting attack chain</strong> —
-            network recon, SMB enumeration, SPN discovery, ticket cracking, and lateral movement to Domain Admin.
-          </p>
-          <p style="font-size:13px;color:#475569;line-height:1.75;margin-top:10px">
-            A second lab covers <strong style="color:#1e293b">EternalBlue / MS17-010</strong> via Metasploit.
-            More labs are on the way. Track your progress in the <strong style="color:#1e293b">CTF panel</strong> on the right,
-            or type <code style="color:#7c3aed">help</code> in the terminal for a step-by-step guide.
-          </p>
+          <div style="font-size:36px;margin-bottom:14px">🌐</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">The Simulated Network</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div class="wc-fact"><span class="wc-pill">10.10.10.5</span> Your Kali attack box — that's you.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#fef9c3;color:#854d0e">10.10.10.10</span> <strong>DC01.CORP.LOCAL</strong> — Windows Server 2019 Domain Controller. Kerberos, LDAP, SMB all respond.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#fee2e2;color:#b91c1c">10.10.10.50</span> <strong>LEGACY</strong> — Windows 7 SP1. Unpatched. EternalBlue vulnerable.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">10.10.20.x</span> EternalBlue lab subnet — separate network, separate targets.</div>
+          </div>
         </div>
 
         <!-- Slide 4: Tips -->
         <div class="wc-slide" style="padding:32px 36px 24px;display:none">
-          <div style="font-size:36px;margin-bottom:14px">💡</div>
-          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">Tips</div>
+          <div style="font-size:36px;margin-bottom:14px">⚡</div>
+          <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">Things worth knowing</div>
           <div style="display:flex;flex-direction:column;gap:10px">
-            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">TAB</span> Tab-complete commands and file paths just like a real shell.</div>
-            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">↑↓</span> Arrow keys cycle through command history.</div>
-            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">+</span> Click <strong style="color:#1e293b">+</strong> in the terminal tab bar to open a second shell.</div>
-            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">reset</span> Type <code>reset</code> to wipe the session and start fresh.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">TAB</span> Autocompletes commands and file paths. Works exactly like bash.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">↑↓</span> Arrow keys scroll through command history.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">ℹ️</span> Click any CTF step to read a plain-English explanation of what it does and why.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">copy</span> Hit the copy button on any CTF step to paste the command directly into the terminal.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#fee2e2;color:#b91c1c">reset</span> Type <code>reset</code> to wipe the session. Try <code>rm -rf / --no-preserve-root</code> if you're feeling brave.</div>
           </div>
         </div>
 
