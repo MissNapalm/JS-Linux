@@ -3095,7 +3095,7 @@ function runCommand(rawInput) {
 
   // Windows shell mode (after psexec)
   if (SIM.windowsShell) {
-    if (cmd === 'exit') {
+    if (cmd === 'exit' || cmd === 'logout') {
       SIM.windowsShell = false;
       SIM.winCwd = 'C:\\Windows\\system32';
       return { lines: [{ t: '' }] };
@@ -3270,7 +3270,10 @@ function runCommand(rawInput) {
 
     if (cmd === 'cls') return { clear: true };
     if (cmd === 'echo %cd%' || cmd === 'cd') return { lines: [{ t: SIM.winCwd }] };
-    return { lines: [{ t: `'${cmd.split(' ')[0]}' is not recognized as an internal or external command.`, cls: 'r' }] };
+    if (/^(ls|cat|pwd|grep|nano|vim|bash|sh|python3?)(\s|$)/.test(cmd)) {
+      return { lines: [{ t: `'${cmd.split(' ')[0]}' is not recognized as an internal or external command,\noperable program or batch file.`, cls: 'r' }] };
+    }
+    return { lines: [{ t: `'${cmd.split(' ')[0]}' is not recognized as an internal or external command,\noperable program or batch file.`, cls: 'r' }] };
   }
 
   if (cmd === 'clear') return { clear: true };
@@ -3292,7 +3295,7 @@ function runCommand(rawInput) {
   }
   if (cmd === 'exit' || cmd === 'logout') {
     if (SIM.user === 'root') return { dropRoot: true };
-    return { lines: [{ t: 'Type exit in your browser to close the tab.', cls: 'd' }] };
+    return { lines: [{ t: 'logout', cls: 'd' }] };
   }
 
   // Walk handlers in order, first match wins
