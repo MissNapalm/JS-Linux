@@ -1453,9 +1453,9 @@ const HANDLERS = [
     match: c => c === 'top' || /^top\s/.test(c),
     liveDisplay: true,
     loadTime: 120000,
-    refreshMs: 500,
+    refreshMs: 1000,
     displayFn: (tick) => {
-      const now = new Date(Date.now() + tick * 500);
+      const now = new Date(Date.now() + tick * 1000);
       const hms = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
       const upM = String(13 + Math.floor(tick * 2 / 60)).padStart(2, '0');
       const upS = String((tick * 2) % 60).padStart(2, '0');
