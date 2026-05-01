@@ -159,10 +159,11 @@
       if (!welcomeModal.classList.contains('hidden')) {
         if (e.key === 'Escape' || e.key === 'Enter') {
           e.preventDefault();
+          e.stopPropagation();
           closeWelcome();
         }
       }
-    });
+    }, true);
 
     const appMenuBtn = document.getElementById('app-menu-btn');
     const appMenu    = document.getElementById('app-menu');
