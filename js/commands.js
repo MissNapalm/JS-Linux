@@ -526,31 +526,187 @@ const HANDLERS = [
     match: c => /^(sudo\s+)?rm\s+.*--no-preserve-root.*-[a-z]*r[a-z]*f[a-z]*\s+\/\*?$/.test(c) || /^(sudo\s+)?rm\s+.*-[a-z]*r[a-z]*f[a-z]*.*--no-preserve-root\s+\/\*?$/.test(c),
     stepLines: [
       { t: '', delay: 0 },
-      { t: 'rm: removing /bin...', cls: 'r', delay: jitter(300, 80) },
-      { t: 'rm: removing /boot...', cls: 'r', delay: jitter(250, 60) },
-      { t: 'rm: removing /dev...', cls: 'r', delay: jitter(200, 50) },
-      { t: 'rm: removing /etc...', cls: 'r', delay: jitter(280, 70) },
-      { t: 'rm: removing /home...', cls: 'r', delay: jitter(220, 60) },
-      { t: 'rm: removing /lib...', cls: 'r', delay: jitter(190, 50) },
-      { t: 'rm: removing /opt...', cls: 'r', delay: jitter(210, 60) },
-      { t: 'rm: removing /proc...', cls: 'r', delay: jitter(170, 40) },
-      { t: 'rm: removing /root...', cls: 'r', delay: jitter(240, 60) },
-      { t: 'rm: removing /run...', cls: 'r', delay: jitter(180, 50) },
-      { t: 'rm: removing /sbin...', cls: 'r', delay: jitter(160, 40) },
-      { t: 'rm: removing /srv...', cls: 'r', delay: jitter(150, 40) },
-      { t: 'rm: removing /sys...', cls: 'r', delay: jitter(200, 50) },
-      { t: 'rm: removing /tmp...', cls: 'r', delay: jitter(140, 30) },
-      { t: 'rm: removing /usr...', cls: 'r', delay: jitter(350, 80) },
-      { t: 'rm: removing /var...', cls: 'r', delay: jitter(280, 70) },
-      { t: '', delay: 600 },
-      { t: 'Segmentation fault (core dumped)', cls: 'r', delay: 800 },
+      // /proc errors flood first
+      { t: "rm: cannot remove '/proc/1/fd/0': Operation not permitted", cls: 'r', delay: 30 },
+      { t: "rm: cannot remove '/proc/1/fd/1': Operation not permitted", cls: 'r', delay: 25 },
+      { t: "rm: cannot remove '/proc/1/fd/2': Operation not permitted", cls: 'r', delay: 20 },
+      { t: "rm: cannot remove '/proc/1/maps': Operation not permitted", cls: 'r', delay: 20 },
+      { t: "rm: cannot remove '/proc/1/mem': Operation not permitted", cls: 'r', delay: 20 },
+      { t: "rm: cannot remove '/proc/2/fd/0': Operation not permitted", cls: 'r', delay: 18 },
+      { t: "rm: cannot remove '/proc/2/fd/1': Operation not permitted", cls: 'r', delay: 18 },
+      { t: "rm: cannot remove '/proc/432/fd/0': Operation not permitted", cls: 'r', delay: 15 },
+      { t: "rm: cannot remove '/proc/432/fd/1': Operation not permitted", cls: 'r', delay: 15 },
+      { t: "rm: cannot remove '/proc/591/fd/0': Operation not permitted", cls: 'r', delay: 15 },
+      { t: "rm: cannot remove '/proc/591/exe': Operation not permitted", cls: 'r', delay: 15 },
+      { t: "rm: cannot remove '/proc/623/fd/0': Operation not permitted", cls: 'r', delay: 15 },
+      { t: "rm: cannot remove '/proc/1234/fd/0': Operation not permitted", cls: 'r', delay: 15 },
+      { t: "rm: cannot remove '/proc/1234/fd/1': Operation not permitted", cls: 'r', delay: 15 },
+      { t: "rm: cannot remove '/proc/1234/fd/2': Operation not permitted", cls: 'r', delay: 15 },
+      { t: "rm: cannot remove '/proc/sysrq-trigger': Operation not permitted", cls: 'r', delay: 20 },
+      { t: "rm: cannot remove '/proc/kcore': Operation not permitted", cls: 'r', delay: 20 },
+      // /sys errors
+      { t: "rm: cannot remove '/sys/kernel/security/apparmor/policy': Read-only file system", cls: 'r', delay: 25 },
+      { t: "rm: cannot remove '/sys/kernel/security/apparmor/profiles': Read-only file system", cls: 'r', delay: 20 },
+      { t: "rm: cannot remove '/sys/fs/cgroup/memory/memory.limit_in_bytes': Read-only file system", cls: 'r', delay: 20 },
+      { t: "rm: cannot remove '/sys/devices/virtual/net/lo/operstate': Read-only file system", cls: 'r', delay: 20 },
+      { t: "rm: cannot remove '/sys/bus/pci/devices/0000:00:0f.0/resource': Read-only file system", cls: 'r', delay: 18 },
+      // normal deletions start — things actually getting wiped
+      { t: "removed '/bin/bash'", cls: 'd', delay: jitter(120, 30) },
+      { t: "removed '/bin/ls'", cls: 'd', delay: jitter(80, 20) },
+      { t: "removed '/bin/cat'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/bin/rm'", cls: 'd', delay: jitter(90, 20) },
+      { t: "removed '/bin/sh'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/bin/cp'", cls: 'd', delay: jitter(60, 15) },
+      { t: "removed '/bin/mv'", cls: 'd', delay: jitter(60, 15) },
+      { t: "removed '/bin/mkdir'", cls: 'd', delay: jitter(60, 15) },
+      { t: "removed '/bin/chmod'", cls: 'd', delay: jitter(60, 15) },
+      { t: "removed '/bin/chown'", cls: 'd', delay: jitter(60, 15) },
+      { t: "removed '/etc/passwd'", cls: 'd', delay: jitter(100, 30) },
+      { t: "removed '/etc/shadow'", cls: 'd', delay: jitter(80, 20) },
+      { t: "removed '/etc/hosts'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/etc/fstab'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/etc/sudoers'", cls: 'd', delay: jitter(80, 20) },
+      { t: "removed '/etc/ssh/sshd_config'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/etc/systemd/system.conf'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/lib/x86_64-linux-gnu/libc.so.6'", cls: 'd', delay: jitter(110, 30) },
+      { t: "removed '/lib/x86_64-linux-gnu/libm.so.6'", cls: 'd', delay: jitter(90, 20) },
+      { t: "removed '/lib/x86_64-linux-gnu/libpthread.so.0'", cls: 'd', delay: jitter(80, 20) },
+      { t: "removed '/lib/x86_64-linux-gnu/libdl.so.2'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2'", cls: 'd', delay: jitter(90, 20) },
+      // things start breaking — garbled/partial output
+      { t: "removed '/usr/bin/python3.11'", cls: 'd', delay: jitter(120, 30) },
+      { t: "removed '/usr/bin/perl'", cls: 'd', delay: jitter(90, 20) },
+      { t: "removed '/usr/bin/ssh'", cls: 'd', delay: jitter(80, 20) },
+      { t: "removed '/usr/sbin/sshd'", cls: 'd', delay: jitter(100, 25) },
+      { t: "removed '/usr/lib/systemd/systemd'", cls: 'd', delay: jitter(130, 30) },
+      { t: "removed '/usr/lib/x86_64-linux-gnu/libssl.so.3'", cls: 'd', delay: jitter(90, 20) },
+      { t: "removed '/usr/lib/x86_64-linux-gnu/libcrypto.so.3'", cls: 'd', delay: jitter(90, 20) },
+      // X11/display starts dying
+      { t: "removed '/usr/lib/xorg/Xorg'", cls: 'd', delay: jitter(150, 40) },
+      { t: "removed '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'", cls: 'd', delay: jitter(80, 20) },
+      // network drops
+      { t: "removed '/usr/sbin/NetworkManager'", cls: 'd', delay: jitter(120, 30) },
+      { t: 'RTNETLINK answers: Network is down', cls: 'r', delay: jitter(400, 100) },
+      // more /proc errors as kernel fights back
+      { t: "rm: cannot remove '/proc/1338/fd/0': No such process", cls: 'r', delay: 25 },
+      { t: "rm: cannot remove '/proc/1338/fd/1': No such process", cls: 'r', delay: 20 },
+      { t: "removed '/var/log/syslog'", cls: 'd', delay: jitter(80, 20) },
+      { t: "removed '/var/log/auth.log'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/home/rembrandt/.bashrc'", cls: 'd', delay: jitter(80, 20) },
+      { t: "removed '/home/rembrandt/.bash_history'", cls: 'd', delay: jitter(70, 20) },
+      { t: "removed '/root/root.txt'", cls: 'd', delay: jitter(90, 20) },
+      // things get weird — partial output, corruption
+      { t: "rm: cannot remove '/run/systemd/private': Device or resource busy", cls: 'r', delay: jitter(200, 50) },
+      { t: "rm: cannot remove '/run/dbus/system_bus_socket': Device or resource busy", cls: 'r', delay: jitter(150, 40) },
+      { t: "removed '/sbin/init'", cls: 'd', delay: jitter(200, 50) },
+      { t: '', delay: 300 },
+      // output starts corrupting
+      { t: '\x1b[?25l\x1b[38;5;196mrm: \x1b[0mcannot remove \x1b[38;5;214m\'/dev/null\'\x1b[0m: \x1b[38;5;196mOperation not permitted\x1b[0m', delay: 200 },
+      { t: '\x1b[38;5;196mrm: \x1b[0mcannot remove \x1b[38;5;214m\'/dev/urandom\'\x1b[0m: \x1b[38;5;196mOperation not permitted\x1b[0m', delay: 150 },
+      { t: '\x1b[38;5;220mremoved \'/dev/sda\'\x1b[0m', delay: jitter(300, 80) },
       { t: '', delay: 400 },
-      { t: '\x1b[5m\x1b[1;31m*** SYSTEM DESTROYED ***\x1b[0m', cls: 'r', delay: 500 },
-      { t: 'You just deleted everything. Congrats.', cls: 'y', delay: 600 },
-      { t: 'Type  reset  to restore the system.', cls: 'd', delay: 400 },
+      // kernel panic begins
+      { t: '\x1b[1;37m[  892.341521] \x1b[0m\x1b[1;31mKernel panic - not syncing: Attempted to kill init! exitcode=0x00000100\x1b[0m', delay: 600 },
+      { t: '\x1b[1;37m[  892.341598] \x1b[0mCPU: 0 PID: 1 Comm: systemd Not tainted 6.6.9-amd64 #1', delay: 80 },
+      { t: '\x1b[1;37m[  892.341612] \x1b[0mHardware name: VMware, Inc. VMware Virtual Platform/440BX Desktop Reference Platform', delay: 80 },
+      { t: '\x1b[1;37m[  892.341631] \x1b[0mCall Trace:', delay: 80 },
+      { t: '\x1b[1;37m[  892.341644] \x1b[0m <TASK>', delay: 60 },
+      { t: '\x1b[1;37m[  892.341658] \x1b[0m dump_stack_lvl+0x37/0x50', delay: 50 },
+      { t: '\x1b[1;37m[  892.341672] \x1b[0m panic+0x118/0x2e0', delay: 50 },
+      { t: '\x1b[1;37m[  892.341685] \x1b[0m do_exit+0xb2c/0xb40', delay: 50 },
+      { t: '\x1b[1;37m[  892.341698] \x1b[0m do_group_exit+0x2d/0x90', delay: 50 },
+      { t: '\x1b[1;37m[  892.341711] \x1b[0m __x64_sys_exit_group+0x14/0x20', delay: 50 },
+      { t: '\x1b[1;37m[  892.341724] \x1b[0m do_syscall_64+0x5b/0x90', delay: 50 },
+      { t: '\x1b[1;37m[  892.341737] \x1b[0m entry_SYSCALL_64_after_hwframe+0x6e/0xd8', delay: 50 },
+      { t: '\x1b[1;37m[  892.341751] \x1b[0m </TASK>', delay: 60 },
+      { t: '\x1b[1;37m[  892.341812] \x1b[0m\x1b[1;31m---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100 ]---\x1b[0m', delay: 200 },
+      { t: '', delay: 800 },
+      // desktop environment starts dying
+      { t: '\x1b[1;33m(xfce4-session:1189): GLib-CRITICAL **: g_main_loop_quit: assertion failed\x1b[0m', delay: 500 },
+      { t: '\x1b[1;33m(xfwm4:1201): GLib-WARNING **: cannot open display: :0\x1b[0m', delay: 200 },
+      { t: '\x1b[1;33m(xfdesktop:1203): Gdk-ERROR **: The program xfdesktop received an X Window System error.\x1b[0m', delay: 200 },
+      { t: '\x1b[1;33mThis probably reflects a bug in the program.\x1b[0m', delay: 80 },
+      { t: '\x1b[1;33mThe error was \x27BadAlloc (insufficient resources for operation)\x27.\x1b[0m', delay: 80 },
+      { t: '\x1b[1;33m  (Details: serial 412 error_code 11 request_code 53 minor_code 0)\x1b[0m', delay: 80 },
+      { t: '\x1b[1;33m  (Note to programmers: normally, X errors are reported asynchronously;\x1b[0m', delay: 60 },
+      { t: '\x1b[1;33m   that is, you will receive the error a while after causing it.)\x1b[0m', delay: 60 },
+      { t: '', delay: 200 },
+      // audio dies
+      { t: '\x1b[90mW: [pulseaudio] core-util.c: Failed to open /proc/self/oom_score_adj: No such file or directory\x1b[0m', delay: 300 },
+      { t: '\x1b[90mW: [pulseaudio] pid.c: Stale PID file, overwriting.\x1b[0m', delay: 150 },
+      { t: '\x1b[1;31mE: [pulseaudio] core-util.c: Failed to create secure directory: No such file or directory\x1b[0m', delay: 150 },
+      { t: '\x1b[1;31mE: [pulseaudio] main.c: Failed to initialize daemon.\x1b[0m', delay: 100 },
+      { t: '', delay: 200 },
+      // display manager segfaults
+      { t: '\x1b[1;31mlightdm[891]: segfault at 0 ip 00007f3a4b2c1000 sp 00007ffd7e4b3d50 error 4 in libglib-2.0.so.0\x1b[0m', delay: 400 },
+      { t: '\x1b[1;31mxfce4-session[1189]: segfault at 8 ip 00007f3a4b3d2100 sp 00007ffd7e4b3e60 error 6 in libxfce4util.so.7\x1b[0m', delay: 200 },
+      { t: '\x1b[1;31mXorg[891]: segfault at 0 ip 00007f3a4b1a0000 sp 00007ffd7e4b2d40 error 4 in libpixman-1.so.0\x1b[0m', delay: 200 },
+      { t: '', delay: 300 },
+      // systemd desperately trying to restart things
+      { t: '\x1b[1;37m[  887.112341] \x1b[0msystemd[1]: lightdm.service: Main process exited, code=dumped, status=11/SEGV', delay: 300 },
+      { t: '\x1b[1;37m[  887.112398] \x1b[0msystemd[1]: lightdm.service: Failed with result \x27core-dump\x27.', delay: 100 },
+      { t: '\x1b[1;37m[  887.112441] \x1b[0msystemd[1]: Failed to start Light Display Manager.', delay: 100 },
+      { t: '\x1b[1;37m[  887.234521] \x1b[0msystemd[1]: networking.service: Main process exited, code=killed, status=9/KILL', delay: 200 },
+      { t: '\x1b[1;37m[  887.234598] \x1b[0msystemd[1]: Reached target Network is Unreachable.', delay: 100 },
+      { t: '\x1b[1;37m[  888.001234] \x1b[0msystemd[1]: systemd-logind.service: Main process exited, code=dumped, status=11/SEGV', delay: 300 },
+      { t: '\x1b[1;37m[  888.001312] \x1b[0msystemd[1]: Stopping User Login Management...', delay: 100 },
+      { t: '\x1b[1;37m[  888.445123] \x1b[0msystemd[1]: dbus.service: Main process exited, code=killed, status=9/KILL', delay: 400 },
+      { t: '\x1b[1;37m[  888.445201] \x1b[0m\x1b[1;31msystemd[1]: dbus.service: Failed. D-Bus is required for further operation. Aborting.\x1b[0m', delay: 200 },
+      { t: '', delay: 400 },
+      // filesystem going read-only as kernel detects corruption
+      { t: '\x1b[1;37m[  889.123456] \x1b[0m\x1b[1;31mEXT4-fs error (device sda1): ext4_find_entry:1455: inode #2: comm rm: reading directory lblock 0\x1b[0m', delay: 300 },
+      { t: '\x1b[1;37m[  889.234567] \x1b[0m\x1b[1;31mEXT4-fs error (device sda1): ext4_journal_check_start:61: Detected aborted journal\x1b[0m', delay: 150 },
+      { t: '\x1b[1;37m[  889.234612] \x1b[0m\x1b[1;31mEXT4-fs (sda1): Remounting filesystem read-only\x1b[0m', delay: 150 },
+      { t: '\x1b[1;37m[  889.345678] \x1b[0mBuffer I/O error on dev sda1, logical block 0, async page read', delay: 100 },
+      { t: '\x1b[1;37m[  889.345712] \x1b[0mBuffer I/O error on dev sda1, logical block 1, async page read', delay: 80 },
+      { t: '\x1b[1;37m[  889.345734] \x1b[0mBuffer I/O error on dev sda1, logical block 2, async page read', delay: 80 },
+      { t: '\x1b[1;37m[  889.456789] \x1b[0m\x1b[1;31msd 0:0:0:0: [sda] tag#0 FAILED Result: hostbyte=DID_OK driverbyte=DRIVER_SENSE\x1b[0m', delay: 200 },
+      { t: '\x1b[1;37m[  889.456834] \x1b[0m\x1b[1;31msd 0:0:0:0: [sda] tag#0 Sense Key : Medium Error [current]\x1b[0m', delay: 100 },
+      { t: '\x1b[1;37m[  889.456878] \x1b[0m\x1b[1;31msd 0:0:0:0: [sda] tag#0 Add. Sense: Unrecovered read error\x1b[0m', delay: 100 },
+      { t: '', delay: 500 },
+      // kernel panic
+      { t: '\x1b[1;37m[  892.341521] \x1b[0m\x1b[1;31mKernel panic - not syncing: Attempted to kill init! exitcode=0x00000100\x1b[0m', delay: 600 },
+      { t: '\x1b[1;37m[  892.341598] \x1b[0mCPU: 0 PID: 1 Comm: systemd Not tainted 6.6.9-amd64 #1', delay: 80 },
+      { t: '\x1b[1;37m[  892.341612] \x1b[0mHardware name: VMware, Inc. VMware Virtual Platform/440BX Desktop Reference Platform', delay: 80 },
+      { t: '\x1b[1;37m[  892.341631] \x1b[0mCall Trace:', delay: 80 },
+      { t: '\x1b[1;37m[  892.341644] \x1b[0m <TASK>', delay: 60 },
+      { t: '\x1b[1;37m[  892.341658] \x1b[0m dump_stack_lvl+0x37/0x50', delay: 50 },
+      { t: '\x1b[1;37m[  892.341672] \x1b[0m panic+0x118/0x2e0', delay: 50 },
+      { t: '\x1b[1;37m[  892.341685] \x1b[0m do_exit+0xb2c/0xb40', delay: 50 },
+      { t: '\x1b[1;37m[  892.341698] \x1b[0m do_group_exit+0x2d/0x90', delay: 50 },
+      { t: '\x1b[1;37m[  892.341711] \x1b[0m __x64_sys_exit_group+0x14/0x20', delay: 50 },
+      { t: '\x1b[1;37m[  892.341724] \x1b[0m do_syscall_64+0x5b/0x90', delay: 50 },
+      { t: '\x1b[1;37m[  892.341737] \x1b[0m entry_SYSCALL_64_after_hwframe+0x6e/0xd8', delay: 50 },
+      { t: '\x1b[1;37m[  892.341751] \x1b[0m </TASK>', delay: 60 },
+      { t: '\x1b[1;37m[  892.341812] \x1b[0m\x1b[1;31m---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100 ]---\x1b[0m', delay: 200 },
+      { t: '', delay: 600 },
+      { t: '\x1b[5m\x1b[1;31m*** KERNEL PANIC — SYSTEM HALTED ***\x1b[0m', delay: 800 },
+      { t: '', delay: 400 },
+      { t: '\x1b[90mType  reset  to reboot the simulation.\x1b[0m', delay: 600 },
     ],
     lines: [],
     after: () => {
+      // dramatic desktop visual crash
+      const desktop = document.getElementById('desktop');
+      if (desktop) {
+        // flicker effect
+        let flickers = 0;
+        const flicker = setInterval(() => {
+          desktop.style.filter = flickers % 2 === 0
+            ? 'brightness(3) contrast(0) invert(1)'
+            : 'brightness(0.1) saturate(0) hue-rotate(180deg)';
+          flickers++;
+          if (flickers > 6) {
+            clearInterval(flicker);
+            // freeze on corrupted frame then go black
+            desktop.style.filter = 'brightness(0.05) saturate(0) blur(2px)';
+            setTimeout(() => {
+              desktop.style.filter = 'brightness(0) saturate(0)';
+              desktop.style.transition = 'filter 0.8s';
+            }, 400);
+          }
+        }, 120);
+      }
       // wipe the simulated filesystem
       SIM.files = {};
       SIM.dirs = new Set();
@@ -2697,7 +2853,7 @@ const HANDLERS = [
   {
     id: 'nmap-eb-discovery',
     loadTime: () => jitter(2800, 500),
-    match: c => /^nmap\b/.test(c) && (c.includes('10.10.20') || c.includes('20.0/24')),
+    match: c => /^nmap\b/.test(c) && (c.includes('10.10.20') || c.includes('20.0/24')) && !c.includes('smb-vuln'),
     lines: [
       { t: 'Starting Nmap 7.94 ( https://nmap.org )' },
       { t: '' },
@@ -3137,6 +3293,11 @@ function runCommand(rawInput) {
       return { lines: [{ t: `The system cannot find the path specified.`, cls: 'r' }] };
     }
 
+    // Meterpreter-only commands don't work in cmd.exe shell
+    if (cmd === 'getuid' || cmd === 'sysinfo' || cmd === 'hashdump' || cmd === 'getsystem') {
+      return { lines: [{ t: `'${cmd}' is not recognized as an internal or external command,\noperable program or batch file.`, cls: 'r' }] };
+    }
+
     if (cmd === 'whoami') return { lines: [{ t: 'nt authority\\system', cls: 'g' }] };
     if (cmd === 'whoami /priv') return { lines: [
       { t: 'PRIVILEGES INFORMATION' }, { t: '----------------------' }, { t: '' },
@@ -3184,10 +3345,10 @@ function runCommand(rawInput) {
         'c:\\windows\\ntds':           [['18,874,368','ntds.dit'],['1,048,576','edb.log'],['8,192','edb.chk']],
         'c:\\windows\\sysvol':         [['<DIR>','domain'],['<DIR>','staging'],['<DIR>','sysvol']],
         'c:\\users':                  [['<DIR>','Administrator'],['<DIR>','Default'],['<DIR>','Public']],
-        'c:\\users\\administrator':    [['<DIR>','Desktop'],['<DIR>','Documents'],['<DIR>','Downloads'],['<DIR>','.ssh']],
+        'c:\\users\\administrator':    [['<DIR>','Desktop'],['<DIR>','Documents'],['<DIR>','Downloads'],['<DIR>','AppData'],['<DIR>','Favorites']],
         'c:\\users\\administrator\\desktop':   [['1,337','flag.txt'],['2,048','notes.txt']],
         'c:\\users\\administrator\\documents': [['4,096','passwords_old.txt'],['8,192','network_map.txt']],
-        'c:\\users\\administrator\\downloads': [],
+        'c:\\users\\administrator\\downloads': [['2,048','winpeas.exe'],['1,024','nc.exe']],
         'c:\\program files':          [['<DIR>','Common Files'],['<DIR>','Internet Explorer'],['<DIR>','Windows Defender'],['<DIR>','Microsoft SQL Server']],
         'c:\\program files (x86)':    [['<DIR>','Common Files'],['<DIR>','Internet Explorer']],
         'c:\\inetpub':                [['<DIR>','wwwroot'],['<DIR>','logs'],['<DIR>','temp']],
@@ -3277,6 +3438,107 @@ function runCommand(rawInput) {
   }
 
   if (cmd === 'clear') return { clear: true };
+
+  // ── Meterpreter shell mode ────────────────────────────────────────────────
+  if (SIM.msf && SIM.msfMeter && !SIM.msfMeterWin) {
+    // Valid meterpreter built-in commands
+    if (cmd === 'whoami' || cmd === 'getuid') {
+      return { openMsf: true, msfEcho: 'Server username: NT AUTHORITY\\SYSTEM' };
+    }
+    if (cmd === 'pwd' || cmd === 'getwd') {
+      return { openMsf: true, msfEcho: 'C:\\Windows\\system32' };
+    }
+    if (cmd === 'ls' || cmd === 'dir') {
+      return { openMsf: true, msfEcho: [
+        'Listing: C:\\Windows\\system32',
+        '==============================',
+        '',
+        'Mode              Size     Type  Last modified              Name',
+        '----              ----     ----  -------------              ----',
+        '40777/rwxrwxrwx   4096     dir   2024-01-15 14:23:01 +0000  config',
+        '40777/rwxrwxrwx   4096     dir   2024-01-15 14:23:01 +0000  drivers',
+        '40777/rwxrwxrwx   4096     dir   2024-01-15 14:23:01 +0000  wbem',
+        '100666/rw-rw-rw-  32768    fil   2024-01-15 14:23:01 +0000  cmd.exe',
+        '100666/rw-rw-rw-  45056    fil   2024-01-15 14:23:01 +0000  net.exe',
+        '100666/rw-rw-rw-  36864    fil   2024-01-15 14:23:01 +0000  whoami.exe',
+        '100666/rw-rw-rw-  28672    fil   2024-01-15 14:23:01 +0000  ipconfig.exe',
+      ].join('\n') };
+    }
+    if (cmd === 'ps') {
+      return { openMsf: true, msfEcho: [
+        'Process List',
+        '============',
+        '',
+        ' PID   PPID  Name                  Arch  Session  User                          Path',
+        ' ---   ----  ----                  ----  -------  ----                          ----',
+        ' 0     0     [System Process]',
+        ' 4     0     System                x64   0',
+        ' 416   4     smss.exe              x64   0        NT AUTHORITY\\SYSTEM',
+        ' 544   536   csrss.exe             x64   0        NT AUTHORITY\\SYSTEM',
+        ' 592   536   wininit.exe           x64   0        NT AUTHORITY\\SYSTEM',
+        ' 604   584   csrss.exe             x64   1        NT AUTHORITY\\SYSTEM',
+        ' 648   592   services.exe          x64   0        NT AUTHORITY\\SYSTEM',
+        ' 656   592   lsass.exe             x64   0        NT AUTHORITY\\SYSTEM',
+        ' 760   648   svchost.exe           x64   0        NT AUTHORITY\\SYSTEM',
+        ' 828   648   svchost.exe           x64   0        NT AUTHORITY\\NETWORK SERVICE',
+        ' 1024  648   spoolsv.exe           x64   0        NT AUTHORITY\\SYSTEM',
+        ' 1337  648   cmd.exe               x64   0        NT AUTHORITY\\SYSTEM           C:\\Windows\\system32\\cmd.exe',
+      ].join('\n') };
+    }
+    if (cmd === 'sysinfo') {
+      return { openMsf: true, msfEcho: [
+        'Computer        : WIN7-PC',
+        'OS              : Windows 7 (6.1 Build 7601, Service Pack 1).',
+        'Architecture    : x64',
+        'System Language : en_US',
+        'Domain          : WORKGROUP',
+        'Logged On Users : 2',
+        'Meterpreter     : x64/windows',
+      ].join('\n') };
+    }
+    if (cmd === 'ipconfig' || cmd === 'ifconfig') {
+      return { openMsf: true, msfEcho: [
+        'Interface  1',
+        '============',
+        'Name         : Software Loopback Interface 1',
+        'Hardware MAC : 00:00:00:00:00:00',
+        'MTU          : 4294967295',
+        'IPv4 Address : 127.0.0.1',
+        'IPv4 Netmask : 255.0.0.0',
+        '',
+        'Interface 11',
+        '============',
+        'Name         : Intel(R) PRO/1000 MT Network Connection',
+        'Hardware MAC : 00:0c:29:3a:bc:de',
+        'MTU          : 1500',
+        'IPv4 Address : 10.10.20.10',
+        'IPv4 Netmask : 255.255.255.0',
+        'IPv4 Gateway : 10.10.20.1',
+      ].join('\n') };
+    }
+    // Block everything else that isn't a real meterpreter command
+    if (/^(cat|grep|nano|vim|bash|sh|find|echo|ss|netstat|arp|ip|uname|id|df|free|top|htop|history|type|cls)(\s|$)/.test(cmd)) {
+      return { lines: [{ t: `[-] Unknown command: ${cmd.split(' ')[0]}`, cls: 'r' }] };
+    }
+  }
+
+  // ── Meterpreter Windows shell (shell command) ──────────────────────────────
+  if (SIM.msf && SIM.msfMeterWin) {
+    if (cmd === 'exit' || cmd === 'logout') {
+      SIM.msfMeterWin = false;
+      return { lines: [{ t: '' }] };
+    }
+    if (/^(ls|cat|pwd|grep|nano|vim|bash|sh|python3?)(\s|$)/.test(cmd)) {
+      return { lines: [{ t: `'${cmd.split(' ')[0]}' is not recognized as an internal or external command,\noperable program or batch file.`, cls: 'r' }] };
+    }
+    // Route through Windows shell block by temporarily setting windowsShell=true, msfMeterWin=false
+    SIM.windowsShell = true;
+    SIM.msfMeterWin = false;
+    const _res = runCommand(cmd);
+    SIM.windowsShell = false;
+    SIM.msfMeterWin = true;
+    return _res;
+  }
   if (cmd === 'reset') {
     const savedUser = localStorage.getItem('hacklet_user') || 'rembrandt';
     SIM.user = savedUser;
@@ -3294,6 +3556,10 @@ function runCommand(rawInput) {
     return { clear: true };
   }
   if (cmd === 'exit' || cmd === 'logout') {
+    if (SIM.msf) {
+      SIM.msf = false; SIM.msfModule = null; SIM.msfMeter = false; SIM.msfMeterWin = false;
+      return { lines: [{ t: '' }] };
+    }
     if (SIM.user === 'root') return { dropRoot: true };
     return { lines: [{ t: 'logout', cls: 'd' }] };
   }

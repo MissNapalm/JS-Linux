@@ -35,6 +35,7 @@ function createTerminal() {
       if (this._cwd  !== null) SIM.cwd  = this._cwd;
       SIM.windowsShell = this._windowsShell;
       SIM.winCwd       = this._winCwd;
+      if (this._msfMeterWin !== undefined) SIM.msfMeterWin = this._msfMeterWin;
     },
     // pull SIM state back into this tab after a command
     _simPull() {
@@ -42,6 +43,7 @@ function createTerminal() {
       this._cwd          = SIM.cwd;
       this._windowsShell = SIM.windowsShell;
       this._winCwd       = SIM.winCwd;
+      this._msfMeterWin  = SIM.msfMeterWin;
     },
 
     init(container) {
@@ -181,7 +183,7 @@ function createTerminal() {
       }
       if (SIM.msf) {
         if (SIM.msfMeterWin) {
-          this._xterm.write('\x1b[33mC:\\Windows\\system32>\x1b[0m ');
+          this._xterm.write('\x1b[33m' + (this._winCwd || SIM.winCwd) + '>\x1b[0m ');
         } else if (SIM.msfMeter) {
           this._xterm.write('\x1b[1;31mmeterpreter\x1b[0m \x1b[31m>\x1b[0m ');
         } else if (SIM.msfModule) {
@@ -973,7 +975,8 @@ function createTerminal() {
         this._busy = true;
         await this._animateSteps(result.stepLines);
         this._busy = false;
-        if (result.after) { result.after(); this._simPull(); }
+        if (result.after) { result.after(); }
+        this._simPull();
         this._writePrompt();
         if (result.id) {
           const captured = CTF.check(result);
@@ -1042,7 +1045,8 @@ function createTerminal() {
         this._busy = true;
         await this._animateSteps(result.stepLines);
         this._busy = false;
-        if (result.after) { result.after(); this._simPull(); }
+        if (result.after) { result.after(); }
+        this._simPull();
         this._writePrompt();
         if (result.id) {
           const captured = CTF.check(result);
