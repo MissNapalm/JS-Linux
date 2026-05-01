@@ -1156,6 +1156,7 @@ function createTerminal() {
 
         render();
         const iv = setInterval(render, refreshMs);
+        this._xterm.write('\x1b[?25l'); // hide cursor during live display
 
         const finish = (cancelled) => {
           clearInterval(iv);
@@ -1165,6 +1166,7 @@ function createTerminal() {
             this._xterm.write('\x1b[' + prevLineCount + 'A\x1b[J');
           }
           if (cancelled) this._xterm.writeln('\x1b[90m^C\x1b[0m');
+          this._xterm.write('\x1b[?25h'); // restore cursor
           resolve(cancelled);
         };
 
