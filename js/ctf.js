@@ -1,97 +1,5 @@
 'use strict';
 
-// ── Kerberoasting challenges ──────────────────────────────────────────────────
-const KERBEROAST_CHALLENGES = [
-  {
-    id: 1, title: 'Port Scan the DC', pts: 100,
-    flag: 'FLAG{dc01_discovered_ports_445_88_389}',
-    hint: 'sudo nmap -sV -sC 10.10.10.10',
-    explain: 'Before you can hack anything, you need to know what\'s there. A port scan is like walking up to a building and checking every door and window to see which ones are open. Every service running on a computer listens on a numbered "port" — web servers use port 80, email uses port 25, and so on.\n\nNmap is the tool everyone uses for this. The -sV flag makes it figure out what software is running on each open port. The -sC flag runs a set of built-in checks to grab extra info automatically.\n\nWhen you scan a Windows Domain Controller you\'ll see port 88 (that\'s Kerberos — the login system), port 389 (LDAP — the user directory), and port 445 (SMB — Windows file sharing). Seeing all three together is a dead giveaway that this is the main Windows server controlling the whole network.',
-    done: false,
-    check: r => r.id === 'nmap-full',
-  },
-  {
-    id: 2, title: 'SMB Enumeration', pts: 100,
-    flag: 'FLAG{corp_local_domain_enumerated}',
-    hint: 'enum4linux -a 10.10.10.10',
-    explain: 'SMB is the Windows file-sharing protocol. Older Windows servers (and many that haven\'t been hardened) allow you to connect anonymously — without a username or password — and still get back useful information. This is called a "null session."\n\nenum4linux automates this. It connects to the target and asks it questions that a normal Windows computer would ask, like "who are the users here?" and "what are the password rules?"\n\nFrom this scan we learn the domain name (CORP.LOCAL), all the usernames (john.doe, svc_backup, svc_sql, svc_web), and that accounts lock out after 5 wrong password attempts. Those usernames are gold — they\'re our targets for the rest of the attack.',
-    done: false,
-    check: r => r.id === 'enum4linux',
-  },
-  {
-    id: 3, title: 'Validate Credentials', pts: 150,
-    flag: 'FLAG{john_doe_authenticated_smb}',
-    hint: "crackmapexec smb 10.10.10.10 -u john.doe -p 'Password1!'",
-    explain: 'We found a notes file on a workstation earlier that had john.doe\'s password written in it. People do this all the time — they save passwords in text files, sticky notes, or shared drives because it\'s convenient. Now we need to check if that password actually works on the main server.\n\nCrackMapExec (CME) is a tool that tests credentials against Windows machines. You give it a username, a password, and a target, and it tells you if the login works.\n\nA [+] result means success — we have a real, working domain account. This is our first foothold. We\'re now a legitimate (if low-level) user inside the network.',
-    done: false,
-    check: r => r.id === 'cme-johndoe',
-  },
-  {
-    id: 4, title: 'Find SPNs', pts: 200,
-    flag: 'FLAG{3_spns_found_svc_backup_svc_sql_svc_web}',
-    hint: "impacket-GetUserSPNs CORP.LOCAL/john.doe:'Password1!' -dc-ip 10.10.10.10",
-    explain: 'This is where Kerberoasting begins. First, some background:\n\nIn Windows networks, services (like a database, a backup program, or a web app) are often run under special accounts called "service accounts." To help Windows find these services, each one is registered with a "Service Principal Name" (SPN) — basically a label that says "this account runs this service."\n\nHere\'s the attack: any normal domain user can ask the Domain Controller for a Kerberos "ticket" to access any of these services. The DC encrypts that ticket using the service account\'s password. We can take that encrypted ticket home and try to crack it offline.\n\nThis step just lists the available targets. We find three service accounts — svc_backup, svc_sql, and svc_web — all of which we can request tickets for.',
-    done: false,
-    check: r => r.id === 'spns-enum',
-  },
-  {
-    id: 5, title: 'Request TGS Tickets', pts: 250,
-    flag: 'FLAG{tgs_tickets_captured_rc4_etype23}',
-    hint: "impacket-GetUserSPNs CORP.LOCAL/john.doe:'Password1!' -dc-ip 10.10.10.10 -request -outputfile hashes.kerberoast",
-    explain: 'Now we actually perform the Kerberoasting attack.\n\nWe ask the Domain Controller to give us Kerberos service tickets for each of the three service accounts. The DC does exactly what it\'s supposed to do — it creates a ticket, encrypts it with the service account\'s password hash, and hands it to us. No alarms, no errors, completely normal behaviour.\n\nThe trick is that we don\'t actually need to use these tickets to access the services. We just need the encrypted data inside them, because that encrypted data was created using the service account\'s password. If the password is weak, we can crack it.\n\nWe save the tickets to a file called hashes.kerberoast. Next step: crack them.',
-    done: false,
-    check: r => r.id === 'spns-request',
-  },
-  {
-    id: 6, title: 'Crack TGS Hashes', pts: 300,
-    flag: 'FLAG{svc_backup_cracked_Backup2023}',
-    hint: 'john hashes.kerberoast --wordlist=/usr/share/wordlists/rockyou.txt',
-    explain: 'Password cracking sounds complicated but the concept is simple: take a list of common passwords, run each one through the same encryption the DC used, and see if the result matches what we captured. If it matches, we found the password.\n\nJohn the Ripper does this automatically. We give it our captured tickets and a wordlist — rockyou.txt contains 14 million real passwords leaked from actual data breaches over the years.\n\nService accounts are a weak point because IT teams often set them up once with a simple password and never change them. Nobody\'s logging in with them interactively, so the password never expires. "Backup2023!" is exactly the kind of password a sysadmin types once in 2023 and forgets about.\n\nWhen John finds a match, we have the real plaintext password.',
-    done: false,
-    check: r => r.id === 'john-crack' || r.id === 'hashcat',
-  },
-  {
-    id: 7, title: 'Validate svc_backup', pts: 200,
-    flag: 'FLAG{svc_backup_backup_operators_group}',
-    hint: "crackmapexec smb 10.10.10.10 -u svc_backup -p 'Backup2023!'",
-    explain: 'We cracked the password — now we confirm it works. But there\'s something more important here than just another working login.\n\nLook at the CME output carefully: it says svc_backup is in the "Backup Operators" group. This is a built-in Windows group that was designed for backup software — it needs to be able to read every file on the system to back them up, even protected system files.\n\nAttackers love Backup Operators because it can read NTDS.dit — the Active Directory database file that stores the password hashes for every single user in the domain. Administrators, regular users, other service accounts — all of them.\n\nOne cracked service account password just gave us the keys to the entire domain.',
-    done: false,
-    check: r => r.id === 'cme-svcbackup',
-  },
-  {
-    id: 8, title: 'Dump NTDS.dit', pts: 400,
-    flag: 'FLAG{ntds_dumped_all_domain_hashes}',
-    hint: "impacket-secretsdump CORP.LOCAL/svc_backup:'Backup2023!'@10.10.10.10",
-    explain: 'NTDS.dit is the crown jewel of any Windows domain. It\'s a database file that the Domain Controller keeps locked and protected — it contains the password hash for every account in the organisation.\n\nimpacket-secretsdump connects to the DC using svc_backup\'s credentials and uses the Backup Operators privileges to remotely read and extract this database. It never needs to copy the actual file — it uses a Windows API called VSS (Volume Shadow Copy Service) to read it while it\'s in use.\n\nThe output is a list of every user account and their NT hash. In a real company this could be thousands of accounts. Every single one of those hashes can be cracked offline or used directly in the next step — no cracking required.',
-    done: false,
-    check: r => r.id === 'secretsdump',
-  },
-  {
-    id: 9, title: 'Pass-the-Hash', pts: 350,
-    flag: 'FLAG{administrator_pth_pwn3d}',
-    hint: 'crackmapexec smb 10.10.10.10 -u Administrator -H fc525c9683e8fe067095ba2ddc971889',
-    explain: 'Here\'s something surprising about Windows: when you log in, your computer never actually sends your password to the server. Instead it sends a "hash" — a scrambled version of your password — as proof that you know it.\n\nThis means if you have someone\'s hash, you can log in as them without ever knowing their real password. This is called Pass-the-Hash (PtH).\n\nWe grabbed the Administrator\'s hash from the NTDS dump. We pass it directly to CME with the -H flag instead of a password. Windows accepts it as valid authentication.\n\nThe [+] Pwn3d! response means we have full Domain Administrator access. We own the entire network.',
-    done: false,
-    check: r => r.id === 'cme-pth',
-  },
-  {
-    id: 10, title: 'SYSTEM Shell', pts: 500,
-    flag: 'FLAG{dc01_compromised_nt_authority_system}',
-    hint: 'impacket-psexec -hashes aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889 CORP.LOCAL/Administrator@10.10.10.10',
-    explain: 'psexec is a tool that uses admin credentials to run programs on a remote Windows machine. It works by uploading a tiny service to the target, starting it, and connecting to it — giving you an interactive command prompt on the remote machine.\n\nBecause we\'re using the Administrator hash, the service runs as NT AUTHORITY\\SYSTEM — the highest privilege level that exists on Windows. SYSTEM is above Administrator. It can read and write any file, change any setting, and cannot be locked out or restricted by normal security policies.\n\nWe now have a fully interactive shell on the Domain Controller with unlimited access. The attack is complete. From a single port scan to full domain compromise — all because one service account had a weak password.',
-    done: false,
-    check: r => r.id === 'psexec',
-  },
-  {
-    id: 11, title: 'Exfiltrate Loot', pts: 500,
-    flag: 'FLAG{23452_customers_pwned_pci_dss_breach_confirmed}',
-    hint: 'dir C:\\CORP_DATA  (then: type C:\\CORP_DATA\\Customer\\Credit_Card_Database.csv)',
-    explain: 'With SYSTEM access on the Domain Controller we can read any file on the server. This final step shows why attackers don\'t stop at "I have access" — they look for data worth stealing.\n\nCompanies sometimes store sensitive files on the DC because it\'s a powerful, always-on machine. Here we find a folder called CORP_DATA containing financial records, HR files with employee SSNs, and a customer credit card database with 23,452 records including card numbers, CVVs, expiry dates, and social security numbers.\n\nThis is a full PCI-DSS breach — the kind that results in millions in fines, mandatory customer notification, and potential criminal charges.\n\nThe entire attack chain took one weak service account password. That\'s it. One password that was never rotated, on an account nobody was watching, brought down the whole organisation.',
-    done: false,
-    check: r => r.id === 'loot-exfil',
-  },
-];
-
 // ── EternalBlue challenges ────────────────────────────────────────────────────
 const ETERNALBLUE_CHALLENGES = [
   {
@@ -169,9 +77,8 @@ const ETERNALBLUE_CHALLENGES = [
 ];
 
 const CTF = {
-  _lab: 'kerberoast',
+  _lab: 'eternalblue',
   _labs: {
-    kerberoast: KERBEROAST_CHALLENGES,
     eternalblue: ETERNALBLUE_CHALLENGES,
   },
 
@@ -199,7 +106,6 @@ const CTF = {
     this._lab = labId;
     // Reset SIM state for the new lab
     SIM.windowsShell = false;
-    SIM.hashesOnDisk = false;
     SIM.lootExfiltrated = false;
     SIM.msfActive = false;
     SIM.msfModule = null;
@@ -228,7 +134,6 @@ const CTF = {
   reset() {
     this.challenges.forEach(c => c.done = false);
     localStorage.removeItem('ctf_state_' + this._lab);
-    SIM.hashesOnDisk = false;
     SIM.windowsShell = false;
     SIM.lootExfiltrated = false;
     SIM.msfActive = false;
@@ -325,7 +230,6 @@ const CTF = {
   init() {
     // Always start fresh — reset progress on every new session
     this.challenges.forEach(c => c.done = false);
-    localStorage.removeItem('ctf_state_kerberoast');
     localStorage.removeItem('ctf_state_eternalblue');
     this._renderSidebar();
 

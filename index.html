@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>RembrandtOS 2024.2 — Kerberoasting CTF Lab</title>
+  <title>RembrandtOS 2024.2 — EternalBlue CTF Lab</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,7 +92,6 @@
       <select id="ctf-lab-select"
         class="w-full text-xs rounded-md border border-slate-200 bg-slate-50 text-slate-600 px-2 py-1.5 outline-none focus:border-violet-400 transition"
         style="font-family:'Ubuntu',sans-serif">
-        <option value="kerberoast">🔑 Kerberoasting Lab</option>
         <option value="eternalblue">💀 EternalBlue Lab</option>
       </select>
     </div>
@@ -266,10 +265,9 @@
           <div style="font-size:36px;margin-bottom:14px">🎯</div>
           <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">Two Attack Labs</div>
           <div style="display:flex;flex-direction:column;gap:12px">
-            <div class="wc-fact"><span class="wc-pill" style="background:#ede9fe;color:#6d28d9">Lab 1</span> <div><strong style="color:#1e293b">Kerberoasting</strong> — Compromise a Windows domain from a single port scan. Enumerate users, steal Kerberos tickets, crack service account passwords, dump NTDS.dit, and own the DC as SYSTEM. 11 steps, 3050 pts.</div></div>
-            <div class="wc-fact"><span class="wc-pill" style="background:#fee2e2;color:#b91c1c">Lab 2</span> <div><strong style="color:#1e293b">EternalBlue</strong> — Exploit MS17-010, the NSA vulnerability that powered WannaCry. No credentials needed. Get a Meterpreter shell as SYSTEM in one shot. 9 steps, 1950 pts.</div></div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#fee2e2;color:#b91c1c">Lab</span> <div><strong style="color:#1e293b">EternalBlue</strong> — Exploit MS17-010, the NSA vulnerability that powered WannaCry. No credentials needed. Get a Meterpreter shell as SYSTEM in one shot. 9 steps, 1950 pts.</div></div>
           </div>
-          <p style="font-size:12px;color:#94a3b8;margin-top:12px">More labs coming. Switch between them in the CTF panel →</p>
+          <p style="font-size:12px;color:#94a3b8;margin-top:12px">More labs coming. The CTF panel tracks your progress →</p>
         </div>
 
         <!-- Slide 3: The network -->
@@ -277,10 +275,9 @@
           <div style="font-size:36px;margin-bottom:14px">🌐</div>
           <div style="font-size:15px;font-weight:700;color:#1e293b;margin-bottom:14px">The Simulated Network</div>
           <div style="display:flex;flex-direction:column;gap:10px">
-            <div class="wc-fact"><span class="wc-pill">10.10.10.5</span> Your Kali attack box — that's you.</div>
-            <div class="wc-fact"><span class="wc-pill" style="background:#fef9c3;color:#854d0e">10.10.10.10</span> <strong>DC01.CORP.LOCAL</strong> — Windows Server 2019 Domain Controller. Kerberos, LDAP, SMB all respond.</div>
-            <div class="wc-fact"><span class="wc-pill" style="background:#fee2e2;color:#b91c1c">10.10.10.50</span> <strong>LEGACY</strong> — Windows 7 SP1. Unpatched. EternalBlue vulnerable.</div>
-            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">10.10.20.x</span> EternalBlue lab subnet — separate network, separate targets.</div>
+            <div class="wc-fact"><span class="wc-pill">10.10.20.5</span> Your Kali attack box — that's you.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#fee2e2;color:#b91c1c">10.10.20.10</span> <strong>WIN7-PC</strong> — Windows 7 SP1. Unpatched SMBv1. EternalBlue (MS17-010) vulnerable.</div>
+            <div class="wc-fact"><span class="wc-pill" style="background:#dcfce7;color:#15803d">10.10.20.x</span> Lab subnet — isolated from production.</div>
           </div>
         </div>
 

@@ -50,9 +50,14 @@
 
     authScreen.style.opacity = '0';
     authScreen.style.transition = 'opacity 0.3s';
-    setTimeout(() => {
+    setTimeout(async () => {
       authScreen.style.display = 'none';
       desktopEl.style.display = 'block';
+      try {
+        await loadLabs();
+      } catch (e) {
+        console.error('[RembrandtOS] Failed to load lab data:', e);
+      }
       initDesktop();
     }, 300);
   }
@@ -69,12 +74,12 @@
     }
     // Populate home subdirectory files
     SIM.files[h + '/Desktop/README.txt']                    = `Welcome to RembrandtOS 2024.2\nThis is your Desktop folder.`;
-    SIM.files[h + '/Documents/credentials.txt']             = `# Credentials found during engagement\n# DO NOT SHARE\njohn.doe : Password1!\nsvc_backup : Backup2023!`;
-    SIM.files[h + '/Documents/network_notes.md']            = `# Network Notes\n## Targets\n- 10.10.10.10 - DC01.CORP.LOCAL (Domain Controller)\n- 10.10.10.5  - Kali attack box\n\n## Open Ports (DC01)\n- 88  Kerberos\n- 389 LDAP\n- 445 SMB\n- 3268 Global Catalog`;
-    SIM.files[h + '/Documents/reports/pentest_report_draft.md'] = `# Penetration Test Report - DRAFT\n## Executive Summary\nA full domain compromise was achieved via Kerberoasting.\n## Findings\n1. Weak service account passwords\n2. No account lockout on service accounts\n3. RC4 encryption allowed on Kerberos tickets`;
-    SIM.files[h + '/Documents/reports/scope.txt']            = `# Engagement Scope\nClient: CORP.LOCAL\nIP Range: 10.10.10.0/24\nDomain Controller: 10.10.10.10\nStart: 2024-01-15\nEnd: 2024-01-22`;
-    SIM.files[h + '/Documents/tools/nmap_cheatsheet.txt']    = `# Nmap Cheatsheet\nnmap -sn 10.10.10.0/24          # ping sweep\nnmap -sV -sC -p- 10.10.10.10    # full scan\nnmap -sU --top-ports 100 <ip>   # UDP scan\nnmap --script vuln <ip>         # vuln scan`;
-    SIM.files[h + '/Documents/tools/ad_attack_notes.txt']    = `# Active Directory Attack Notes\n## Kerberoasting\n1. GetUserSPNs -> request TGS tickets\n2. Crack offline with john/hashcat\n\n## Pass-the-Hash\n- Use NT hash directly with CME -H flag\n\n## DCSync\n- Requires Replication rights or Domain Admin`;
+    SIM.files[h + '/Documents/credentials.txt']             = `# Credentials found during engagement\n# DO NOT SHARE\nadmin : ChangeMe123!`;
+    SIM.files[h + '/Documents/network_notes.md']            = `# Network Notes\n## EternalBlue lab targets\n- 10.10.20.5  - Kali attack box (you)\n- 10.10.20.10 - WIN7-PC (Windows 7 SP1, SMB exposed)\n\n## Open Ports (WIN7-PC)\n- 135 RPC\n- 139 NetBIOS\n- 445 SMB (vulnerable to MS17-010)\n- 3389 RDP`;
+    SIM.files[h + '/Documents/reports/pentest_report_draft.md'] = `# Penetration Test Report - DRAFT\n## Executive Summary\nA legacy Windows host was compromised via MS17-010 (EternalBlue), giving SYSTEM-level shell access.\n## Findings\n1. Unpatched SMBv1 on internal subnet\n2. No network segmentation between attack and victim subnets\n3. Sensitive documents stored on Administrator desktop`;
+    SIM.files[h + '/Documents/reports/scope.txt']            = `# Engagement Scope\nClient: WORKGROUP / 10.10.20.0/24\nIP Range: 10.10.20.0/24\nKey target: 10.10.20.10 (WIN7-PC)\nStart: 2024-01-15\nEnd: 2024-01-22`;
+    SIM.files[h + '/Documents/tools/nmap_cheatsheet.txt']    = `# Nmap Cheatsheet\nnmap -sn 10.10.20.0/24                                  # ping sweep\nnmap -sV -p- 10.10.20.10                                # full version scan\nnmap -p 445 --script smb-vuln-ms17-010 10.10.20.10      # ms17-010 check\nnmap --script vuln <ip>                                 # generic vuln scan`;
+    SIM.files[h + '/Documents/tools/ad_attack_notes.txt']    = `# Windows Exploitation Notes\n## EternalBlue (MS17-010)\n1. Confirm SMBv1 is exposed on 445\n2. msfconsole -> use exploit/windows/smb/ms17_010_eternalblue\n3. set RHOSTS, set LHOST, exploit\n\n## Post-exploitation\n- hashdump for local SAM hashes\n- shell to drop into cmd.exe as SYSTEM`;
     SIM.files[h + '/Downloads/linpeas.sh']                   = `#!/bin/bash\n# linpeas.sh - Linux Privilege Escalation Awesome Script\necho "[+] Starting LinPEAS..."\necho "[+] System info:" && uname -a`;
     SIM.files[h + '/.ssh/known_hosts']                       = `10.10.10.10 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC...\n10.10.10.1 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY...`;
     SIM.files[h + '/.bashrc']                                = `# ~/.bashrc: executed by bash for non-login shells\nexport PATH="$HOME/.local/bin:$PATH"\nalias ll='ls -alF'\nalias la='ls -A'\nalias l='ls -CF'\nalias grep='grep --color=auto'\nalias ls='ls --color=auto'\nPS1='\\u@\\h:\\w\\$ '`;
@@ -385,7 +390,6 @@
   // ── Virtual filesystem for file manager ───────────────────────────────────
   function fmGetDir(path) {
     const kh = '/home/' + SIM.user;
-    const hashes = SIM.hashesOnDisk ? [{ name: 'hashes.kerberoast', type: 'file' }] : [];
     const map = {
       '/': [
         { name: 'home', type: 'dir' },
@@ -404,7 +408,6 @@
         { name: 'Pictures',  type: 'dir' },
         { name: 'Videos',    type: 'dir' },
         { name: 'notes.txt', type: 'file' },
-        ...hashes,
       ],
       [kh + '/Desktop']:   [],
       [kh + '/Documents']: [],
@@ -414,7 +417,6 @@
       [kh + '/Videos']:    [],
       '/root': [
         { name: 'notes.txt', type: 'file' },
-        ...hashes,
       ],
       '/etc': [
         { name: 'hosts',      type: 'file' },
@@ -432,14 +434,9 @@
   }
 
   function fmGetFileContent(path) {
-    const extras = SIM.hashesOnDisk ? {
-      '/home/rembrandt/hashes.kerberoast': KRB5_HASHES,
-      '/root/hashes.kerberoast': KRB5_HASHES,
-    } : {};
     const all = {
       ...SIM.files,
-      ...extras,
-      '/usr/share/wordlists/rockyou.txt': '# rockyou.txt — 14,341,564 passwords\n[file truncated for display]\npassword\n123456\npassword1\nPassword1!\nBackup2023!\nletmein\nqwerty\n...',
+      '/usr/share/wordlists/rockyou.txt': '# rockyou.txt — 14,341,564 passwords\n[file truncated for display]\npassword\n123456\npassword1\nletmein\nqwerty\n...',
     };
     return all[path] !== undefined ? all[path] : null;
   }
@@ -603,7 +600,7 @@
         };
         return `<span class="fm-icon-emoji">${map[item.name] || '📁'}</span>`;
       }
-      if (item.name.endsWith('.kerberoast') || item.name.endsWith('.hash')) {
+      if (item.name.endsWith('.hash')) {
         return '<span class="fm-icon-emoji">🔑</span>';
       }
       if (item.name.endsWith('.txt')) return '<span class="fm-icon-emoji">📝</span>';
@@ -612,7 +609,6 @@
     }
 
     function fmIconSm(name) {
-      if (name.endsWith('.kerberoast')) return '🔑';
       if (name.endsWith('.txt'))        return '📝';
       return '📄';
     }

